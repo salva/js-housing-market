@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Housing Market Simulator</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.3.min.js"></script>
+  <script src="housing-market.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 20px; display: flex; }
+    #slider-container { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; }
+    #sliders-box, #info-box { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+    .plot-container { flex: 2; padding: 10px; }
+    .plot { height: 400px; }
+    .pending-change { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <div id="slider-container">
+    <h2>Housing Market Simulator</h2>
+    <div id="sliders-box">
+      <label for="nRenters">Number of Renters: <span id="nRentersValue">1000</span></label><br>
+      <input type="range" id="nRenters" min="1000" max="20000" step="1000" value="1000"><br><br>
+
+      <label for="nHouses">Number of Houses: <span id="nHousesValue">1000</span></label><br>
+      <input type="range" id="nHouses" min="1000" max="20000" step="1000" value="1000"><br><br>
+
+      <label for="rentAffordability">Rent Affordability Ratio (%): <span id="rentAffordabilityValue">50</span></label><br>
+      <input type="range" id="rentAffordability" min="1" max="100" step="1" value="50"><br><br>
+
+      <label for="costOfLiving">Minimum Cost of Living: <span id="costOfLivingValue">1000</span></label><br>
+      <input type="range" id="costOfLiving" min="0" max="3000" step="50" value="1000"><br><br>
+
+      <label for="markup">Initial Price Markup (%): <span id="markupValue">10</span></label><br>
+      <input type="range" id="markup" min="0.0" max="50.0" step="0.5" value="10"><br><br>
+
+      <label for="priceDrop">Vacancy Weekly Price Drop (%): <span id="priceDropValue">1</span></label><br>
+      <input type="range" id="priceDrop" min="0.0" max="25.0" step="0.1" value="1"><br><br>
+
+      <label for="housesPerStep">Houses Considered per Step: <span id="housesPerStepValue">10</span></label><br>
+      <input type="range" id="housesPerStep" min="1" max="50" step="1" value="10"><br><br>
+
+      <label for="rentalDuration">Max Rental Duration (years): <span id="rentalDurationValue">5</span></label><br>
+      <input type="range" id="rentalDuration" min="0" max="20" step="0.25" value="5"><br><br>
+
+      <label for="salary">Average Salary: <span id="salaryValue">2000</span></label><br>
+      <input type="range" id="salary" min="0" max="5000" step="100" value="2000"><br><br>
+
+      <label for="showYears">Show Years: <span id="showYearsValue">10</span></label><br>
+      <input type="range" id="showYears" min="1" max="400" step="1" value="10"><br><br>
+
+      <label for="updateSpeed">Simulation Speed: <span id="updateSpeedValue">1</span></label><br>
+      <input type="range" id="updateSpeed" min="1" max="8" step="1" value="1"><br><br>
+    </div>
+    <div id="info-box">
+      <h3>Current Statistics</h3>
+      <div id="stats">
+        <p>Average Rent: <span id="avgRent">$0</span></p>
+        <p>Vacancy Rate: <span id="vacancyRate">0%</span></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="plot-container">
+    <div id="plot1" class="plot"></div>
+  </div>
+
+  <div class="plot-container">
+    <div id="plot2" class="plot"></div>
+  </div>
+
+  <script>
+    class HousingMarket {
+      constructor() {
+        this.nRenters = 1000;
+        this.nHouses = 1000;
+        this.rentAffordability = 0.5;
+        this.costOfLiving = 1000;
+        this.markup = 0.1;
+        this.priceDrop = 0.01;
+        this.housesPerStep = 10;
+        this.maxRentalDuration = 5 * 52;
+        this.salary = 2000;
+        this.showTicks = 52 * 10;
+        this.updateSpeed = 1;
+      }
+      adjustPopulation(val) { this.nRenters = val; }
+      adjustHousing(val) { this.nHouses = val; }
+      setRentAffordability(val) { this.rentAffordability = val / 100; }
+      setCostOfLiving(val) { this.costOfLiving = val; }
+      setMarkup(val) { this.markup = val / 100; }
+      setPriceDrop(val) { this.priceDrop = val / 100; }
+      setHousesPerStep(val) { this.housesPerStep = val; }
+      setRentalDuration(val) { this.maxRentalDuration = Math.max(val * 52, 52); }
+      setSalary(val) { this.salary = val; }
+      setShowTicks(val) { this.showTicks = val * 52; }
+      setUpdateSpeed(val) { this.updateSpeed = val; }
+      step() {}
+      getHistory() { return { times: [0], values: [0] }; }
+    }
+
+    const housingMarket = new HousingMarket();
+
+    function bindWidgetToModel(inputId, valueId, updateFunc) {
+      const input = document.getElementById(inputId);
+      const valueSpan = document.getElementById(valueId);
+      input.addEventListener('input', e => {
+        valueSpan.textContent = e.target.value;
+        valueSpan.classList.add('pending-change');
+      });
+      input.addEventListener('change', e => {
+        updateFunc(parseFloat(e.target.value));
+        valueSpan.classList.remove('pending-change');
+      });
+    }
+
+    bindWidgetToModel('nRenters', 'nRentersValue', v => housingMarket.adjustPopulation(v));
+    bindWidgetToModel('nHouses', 'nHousesValue', v => housingMarket.adjustHousing(v));
+    bindWidgetToModel('rentAffordability', 'rentAffordabilityValue', v => housingMarket.setRentAffordability(v));
+    bindWidgetToModel('costOfLiving', 'costOfLivingValue', v => housingMarket.setCostOfLiving(v));
+    bindWidgetToModel('markup', 'markupValue', v => housingMarket.setMarkup(v));
+    bindWidgetToModel('priceDrop', 'priceDropValue', v => housingMarket.setPriceDrop(v));
+    bindWidgetToModel('housesPerStep', 'housesPerStepValue', v => housingMarket.setHousesPerStep(v));
+    bindWidgetToModel('rentalDuration', 'rentalDurationValue', v => housingMarket.setRentalDuration(v));
+    bindWidgetToModel('salary', 'salaryValue', v => housingMarket.setSalary(v));
+    bindWidgetToModel('showYears', 'showYearsValue', v => housingMarket.setShowTicks(v));
+    bindWidgetToModel('updateSpeed', 'updateSpeedValue', v => housingMarket.setUpdateSpeed(v));
+
+    Plotly.newPlot('plot1', [{ x: [], y: [], mode: 'lines', name: 'Placeholder 1' }], { title: 'Plot 1' });
+    Plotly.newPlot('plot2', [{ x: [], y: [], mode: 'lines', name: 'Placeholder 2' }], { title: 'Plot 2' });
+
+    function updateStatistics() {
+      document.getElementById('avgRent').textContent = '$' + (Math.random() * 2000).toFixed(2);
+      document.getElementById('vacancyRate').textContent = (Math.random() * 10).toFixed(2) + '%';
+    }
+
+    function simulate() {
+      housingMarket.step();
+      const history = housingMarket.getHistory();
+      Plotly.update('plot1', { x: [history.times], y: [history.values] });
+      Plotly.update('plot2', { x: [history.times], y: [history.values.map(v => v * 0.5)] });
+      updateStatistics();
+      requestAnimationFrame(simulate);
+    }
+
+    requestAnimationFrame(simulate);
+  </script>
+
+</body>
+</html>
