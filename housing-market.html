@@ -12,6 +12,7 @@
     .plot-container { flex: 2; padding: 10px; }
     .plot { height: 400px; }
     .pending-change { color: red; font-weight: bold; }
+    .slider-description { font-size: 0.85em; color: #666; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -20,37 +21,48 @@
     <h2>Housing Market Simulator</h2>
     <div id="sliders-box">
       <label for="nRenters">Number of Renters: <span id="nRentersValue">1000</span></label><br>
-      <input type="range" id="nRenters" min="1000" max="20000" step="1000" value="1000"><br><br>
+      <input type="range" id="nRenters" min="1000" max="20000" step="1000" value="1000"><br>
+      <div class="slider-description">Total number of people looking to rent a house.</div>
 
       <label for="nHouses">Number of Houses: <span id="nHousesValue">1000</span></label><br>
-      <input type="range" id="nHouses" min="1000" max="20000" step="1000" value="1000"><br><br>
+      <input type="range" id="nHouses" min="1000" max="20000" step="1000" value="1000"><br>
+      <div class="slider-description">Total number of houses available for rent in the market.</div>
 
       <label for="rentAffordability">Rent Affordability Ratio (%): <span id="rentAffordabilityValue">50</span></label><br>
-      <input type="range" id="rentAffordability" min="1" max="100" step="1" value="50"><br><br>
+      <input type="range" id="rentAffordability" min="1" max="100" step="1" value="50"><br>
+      <div class="slider-description">Maximum percentage of income renters are willing to spend on rent.</div>
 
       <label for="costOfLiving">Minimum Cost of Living: <span id="costOfLivingValue">1000</span></label><br>
-      <input type="range" id="costOfLiving" min="0" max="3000" step="50" value="1000"><br><br>
+      <input type="range" id="costOfLiving" min="0" max="3000" step="50" value="1000"><br>
+      <div class="slider-description">Base monthly living cost apart from rent, affecting affordability.</div>
 
       <label for="markup">Initial Price Markup (%): <span id="markupValue">10</span></label><br>
-      <input type="range" id="markup" min="0.0" max="50.0" step="0.5" value="10"><br><br>
+      <input type="range" id="markup" min="0.0" max="50.0" step="0.5" value="10"><br>
+      <div class="slider-description">Initial price increase percentage landlords apply over cost-based rent.</div>
 
       <label for="priceDrop">Vacancy Weekly Price Drop (%): <span id="priceDropValue">1</span></label><br>
-      <input type="range" id="priceDrop" min="0.0" max="25.0" step="0.1" value="1"><br><br>
+      <input type="range" id="priceDrop" min="0.0" max="25.0" step="0.1" value="1"><br>
+      <div class="slider-description">Percentage by which rent decreases weekly when a house remains vacant.</div>
 
       <label for="housesPerStep">Houses Considered per Step: <span id="housesPerStepValue">10</span></label><br>
-      <input type="range" id="housesPerStep" min="1" max="50" step="1" value="10"><br><br>
+      <input type="range" id="housesPerStep" min="1" max="50" step="1" value="10"><br>
+      <div class="slider-description">Number of houses each renter evaluates at each simulation step.</div>
 
       <label for="rentalDuration">Max Rental Duration (years): <span id="rentalDurationValue">5</span></label><br>
-      <input type="range" id="rentalDuration" min="0" max="20" step="0.25" value="5"><br><br>
+      <input type="range" id="rentalDuration" min="0" max="20" step="0.25" value="5"><br>
+      <div class="slider-description">Maximum number of years a renter can stay in the same house.</div>
 
       <label for="salary">Average Salary: <span id="salaryValue">2000</span></label><br>
-      <input type="range" id="salary" min="0" max="5000" step="100" value="2000"><br><br>
+      <input type="range" id="salary" min="0" max="5000" step="100" value="2000"><br>
+      <div class="slider-description">Average monthly income of the renters in the simulation.</div>
 
       <label for="showYears">Show Years: <span id="showYearsValue">10</span></label><br>
-      <input type="range" id="showYears" min="1" max="400" step="1" value="10"><br><br>
+      <input type="range" id="showYears" min="1" max="400" step="1" value="10"><br>
+      <div class="slider-description">Number of years of simulation history to display in the graphs.</div>
 
       <label for="updateSpeed">Simulation Speed: <span id="updateSpeedValue">1</span></label><br>
-      <input type="range" id="updateSpeed" min="1" max="8" step="1" value="1"><br><br>
+      <input type="range" id="updateSpeed" min="1" max="8" step="1" value="1"><br>
+      <div class="slider-description">Number of simulation steps executed per frame.</div>
     </div>
     <div id="info-box">
       <h3>Current Statistics</h3>
