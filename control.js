@@ -13,6 +13,9 @@ class Control {
     constructor() {}
 
     init() {
+        this.showLength = config.showLength.default;
+        this.simulationSpeed = config.simulationSpeed.default;
+        
         this.initDisplayWidgets();
         this.setWidgetDefaults();
         this.resetButtonClicked()
@@ -52,7 +55,8 @@ class Control {
         this.resetButton.disabled = true;
 
         this.initModel();
-        this.bindSimulationWidgets();
+        this.bindWidgets(`#simulation-box`, this.model);
+        this.bindWidgets(`#display-box`, this);
         this.parameterizeModelFromWidgets();
         this.initHistory();
         this.step();
@@ -69,8 +73,10 @@ class Control {
 
     step() {
         if (this.state === "running") {
-            this.model.step();
-            this.history.push();
+            for (let i = 0; i < this.simulationSpeed; i++) {
+                this.model.step();
+                this.history.push();
+            }
             this.updateDisplay();
         }
     }
@@ -117,24 +123,24 @@ class Control {
         });
     }
 
-    bindSimulationWidgets() {
+    bindWidgets(boxSelector, targetObject) {
         console.log("Control: bindSimulationWidgets");
-        function bindWidgetToModel(inputId, valueId, updateFunc, normalizeFunc = v => v) {
-            const input = document.getElementById(inputId);
+        function bindSlider(sliderId, valueId, updateFunc, normalizeFunc = v => v) {
+            const slider = document.getElementById(sliderId);
             const valueSpan = document.getElementById(valueId);
-            input.addEventListener('input', e => {
+            slider.addEventListener('input', e => {
                 valueSpan.textContent = e.target.value;
                 valueSpan.classList.add('pending-change');
             });
-            input.addEventListener('change', e => {
-                console.log("Updating value for " + inputId + ": " + e.target.value);
+            slider.addEventListener('change', e => {
+                console.log("Updating value for " + sliderId + ": " + e.target.value);
                 updateFunc(normalizeFunc(parseFloat(e.target.value)));
                 valueSpan.classList.remove('pending-change');
             });
         }
 
-        const sliderElements = document.querySelectorAll('#simulation-box input[type="range"]');
-        console.log("sliderElements: ", sliderElements);
+        const sliderElements = document.querySelectorAll(`${boxSelector} input[type="range"]`);
+        // console.log("sliderElements: ", sliderElements);
         sliderElements.forEach(slider => {
             const key = slider.id;
             const normalizer = slider.dataset.normalizer;
@@ -147,7 +153,8 @@ class Control {
                 normalizeFunc = yearsToWeeks;
             }
 
-            bindWidgetToModel(key, `${key}Value`, v => this.model[methodName](v), normalizeFunc);
+            console.log(`lookup, methodName: ${methodName}`);
+            bindSlider(key, `${key}Value`, v => targetObject[methodName](v), normalizeFunc);
         });
     }
 
@@ -177,7 +184,7 @@ class Control {
                                         { x: [], y: [], mode: 'lines', name: 'Vacant Houses' }],
                        { title: 'Houses vs Time',
                          xaxis: { title: 'Date' },
-                         yaxis: { title: 'House Market' } });
+                         yaxis: { title: 'House Market', rangemode: 'tozero' } });
 
         Plotly.newPlot('rentVsTime', [{ x: [], y: [], mode: 'lines', name: 'Avg all' },
                                       { x: [], y: [], mode: 'lines', name: 'Avg rented' },
@@ -186,13 +193,13 @@ class Control {
                                       { x: [], y: [], mode: 'lines', name: 'Amortized rented' }],
                        { title: 'Rent Prices Vs Time',
                          xaxis: { title: 'Date' },
-                         yaxis: { title: 'Price' } });
+                         yaxis: { title: 'Price', rangemode: 'tozero' } });
 
         Plotly.newPlot('vacantTime', [{ x: [], y: [], mode: 'lines', name: 'Avg house vacant time' },
                                       { x: [], y: [], mode: 'lines', name: 'Avg renter looking time' }],
                        { title: 'Looking/renting Times',
                          xaxis: { title: 'Date' },
-                         yaxis: { title: 'Weeks' } });
+                         yaxis: { title: 'Weeks', rangemode: 'tozero' } });
 
         Plotly.newPlot('rentPriceHist', [{ x: [], type: 'histogram', name: 'RentPrice' }],
                        { title: 'Rent Price' });
@@ -205,19 +212,27 @@ class Control {
                        { title: 'Income' });
     }
 
+    cutToShowLength(arg) {
+        return arg.slice(-this.showLength);
+    }
+
+    cutArgsToShowLength(...args) {
+        return args.map((a) => this.cutToShowLength(a))
+    }
+
     updateGraphs() {
         const m = this.model;
         const h = this.history;
-        const t = h.times;
+        const t = this.cutToShowLength(h.times);
 
         Plotly.update('housesVsTime', { x: [t, t, t],
-                                        y: [h.housesAll, h.housesRented, h.housesVacant] });
+                                        y: this.cutArgsToShowLength(h.housesAll, h.housesRented, h.housesVacant) });
 
         Plotly.update('rentVsTime', { x: [t, t, t, t, t],
-                                      y: [h.rentAll, h.rentRented, h.rentVacant, h.inTickRentPrice, h.currentRentPrice] });
+                                      y: this.cutArgsToShowLength(h.rentAll, h.rentRented, h.rentVacant, h.inTickRentPrice, h.currentRentPrice) });
 
         Plotly.update('vacantTime', { x: [t, t],
-                                      y: [h.inTickVacantTime, h.inTickLookingTime] });
+                                      y: this.cutArgsToShowLength(h.inTickVacantTime, h.inTickLookingTime) });
 
         Plotly.update('rentPriceHist', { x: [Object.values(m.houses).map((house) => house.rentPrice)] });
         Plotly.update('rentLengthHist', { x: [Array.from(m.housesRented, (houseId) => m.houses[houseId].rentingTime)] });
@@ -225,4 +240,14 @@ class Control {
                                           Array.from(m.rentersLooking, (renterId) => m.renterIncome(m.renters[renterId]))] });
     }
 
+    // display callbacks
+
+    setShowLength(weeks) {
+        this.showLength = weeks;
+        this.updateDisplay();
+    }
+
+    setSimulationSpeed(speed) {
+        this.simulationSpeed = speed;
+    }
 }

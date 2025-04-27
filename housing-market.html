@@ -18,6 +18,16 @@
         padding: 10px;
         font-weight: bold;
         border-bottom: 1px solid #ccc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .collapse-button {
+        background: none;
+        border: none;
+        font-size: 1em;
+        cursor: pointer;
+        padding: 0;
       }
       .collapsible-content { padding: 10px; display: block; }
       .collapsed .collapsible-content { display: none; }
@@ -33,7 +43,7 @@
       <h2>Housing Market Simulator</h2>
 
       <div class="collapsible-box">
-        <div class="collapsible-header">Control</div>
+        <div class="collapsible-header">Control <button class="collapse-button">&#9660;</button></div>
         <div class="collapsible-content" id="control-box">
           <button id="runButton">Run</button>
           <button id="pauseButton">Pause</button>
@@ -42,7 +52,7 @@
       </div>
 
       <div class="collapsible-box">
-        <div class="collapsible-header">Current Statistics</div>
+        <div class="collapsible-header">Current Statistics <button class="collapse-button">&#9660;</button></div>
         <div class="collapsible-content" id="info-box">
           <div id="stats">
             <p>Total Houses: <span id="housesAll">0</span></p>
@@ -60,20 +70,20 @@
       </div>
 
       <div class="collapsible-box">
-        <div class="collapsible-header">Display Settings</div>
+        <div class="collapsible-header">Display Settings <button class="collapse-button">&#9660;</button></div>
         <div class="collapsible-content" id="display-box">
-          <label for="showYears">Show Years: <span id="showYearsValue">10</span></label><br>
-          <input type="range" id="showYears" data-normalizer="years"><br>
+          <label for="showLength">Show Years: <span id="showLengthValue">10</span></label><br>
+          <input type="range" id="showLength" data-normalizer="years"><br>
           <div class="slider-description">Number of years of simulation history to display.</div>
 
-          <label for="updateSpeed">Simulation Speed: <span id="updateSpeedValue">1</span></label><br>
-          <input type="range" id="updateSpeed"><br>
+          <label for="simulationSpeed">Simulation Speed: <span id="simulationSpeedValue">1</span></label><br>
+          <input type="range" id="simulationSpeed"><br>
           <div class="slider-description">Number of simulation steps executed per frame.</div>
         </div>
       </div>
 
       <div class="collapsible-box">
-        <div class="collapsible-header">Simulation Settings</div>
+        <div class="collapsible-header">Simulation Settings <button class="collapse-button">&#9660;</button></div>
         <div class="collapsible-content" id="simulation-box">
           <label for="nRenters">Number of Renters: <span id="nRentersValue">1000</span></label><br>
           <input type="range" id="nRenters"><br>
@@ -140,9 +150,12 @@
           requestAnimationFrame(step);
 
           document.querySelectorAll('.collapsible-header').forEach(header => {
-            header.addEventListener('click', () => {
-              const box = header.parentElement;
-              box.classList.toggle('collapsed');
+            header.addEventListener('click', (event) => {
+              if (event.target.classList.contains('collapse-button')) {
+                const box = header.parentElement;
+                box.classList.toggle('collapsed');
+                event.target.innerHTML = box.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
+              }
             });
           });
       });

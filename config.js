@@ -45,13 +45,13 @@ const config = {
         default: 2000
     },
     showLength: {
-        min: 1,
-        max: 40*52,
+        min: 52 / 2,
+        max: 100*52,
         default: 10*52,
     },
-    updateSpeed: {
+    simulationSpeed: {
         min: 1,
-        max: 8,
+        max: 4,
         default: 1
     }
 };

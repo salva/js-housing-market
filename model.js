@@ -149,8 +149,8 @@ class HousingMarket {
     }
 
     setRentalDuration(val) {
-        console.log(`Max Rental Duration changed from ${this.maxRentalDuration} to ${val}`);
-        this.maxRentalDuration = val;
+        console.log(`Max Rental Duration changed from ${this.rentalDurationMax} to ${val}`);
+        this.rentalDurationMax = val;
     }
 
     setIncome(val) {
