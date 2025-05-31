@@ -3,10 +3,11 @@
   <head>
     <meta charset="UTF-8">
     <title>Housing Market Simulator</title>
-    <script src="https://cdn.plot.ly/plotly-2.35.3.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
     <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
     <script src="config.js"></script>
     <script src="model.js"></script>
+    <script src="graphs.js"></script>
     <script src="control.js"></script>
     <style>
       body { font-family: sans-serif; margin: 20px; display: flex; }
@@ -33,6 +34,7 @@
       .collapsed .collapsible-content { display: none; }
       .plot-container { flex: 2; padding: 10px; }
       .plot { height: 400px; }
+      .distribution { height: 150px; }
       .pending-change { color: red; font-weight: bold; }
       .slider-description { font-size: 0.85em; color: #666; margin-bottom: 10px; }
     </style>
@@ -56,12 +58,13 @@
         <div class="collapsible-content" id="info-box">
           <div id="stats">
             <p>Total Houses: <span id="housesAll">0</span></p>
-            <p>Rented Houses: <span id="housesRented">0</span></p>
-            <p>Vacant Houses: <span id="housesVacant">0</span></p>
+            <p>Houses for sale: <span id="housesForSale">0</span></p>
+            <p>Houses for rent: <span id="housesForRent">0</span></p>
+            <p>Houses rented: <span id="housesRented">0</span></p>
+            <p>Houses occupied by owner: <span id="housesOccupiedByOwner">0</span></p>
             <p>Vacancy Rate: <span id="vacancyRate">0</span>%</p>
-            <p>Total Renters: <span id="rentersAll">0</span></p>
-            <p>Renters Looking: <span id="rentersLooking">0</span></p>
-            <p>Renters Renting: <span id="rentersRenting">0</span></p>
+            <p>Total Citizens: <span id="citizensAll">0</span></p>
+            <p>Citizens Looking: <span id="citizensLooking">0</span></p>
             <p>Looking Rate: <span id="lookingRate">0</span>%</p>
             <p>Average Rent: $<span id="rentPrice">0</span></p>
             <p>Current Renting Price: $<span id="inTickRentPrice">0</span></p>
@@ -71,7 +74,7 @@
 
       <div class="collapsible-box">
         <div class="collapsible-header">Display Settings <button class="collapse-button">&#9660;</button></div>
-        <div class="collapsible-content" id="display-box">
+        <div class="collapsible-content" id="display-box" target-object="control">
           <label for="showLength">Show Years: <span id="showLengthValue">10</span></label><br>
           <input type="range" id="showLength" data-normalizer="years"><br>
           <div class="slider-description">Number of years of simulation history to display.</div>
@@ -84,57 +87,252 @@
 
       <div class="collapsible-box">
         <div class="collapsible-header">Simulation Settings <button class="collapse-button">&#9660;</button></div>
-        <div class="collapsible-content" id="simulation-box">
-          <label for="nRenters">Number of Renters: <span id="nRentersValue">1000</span></label><br>
-          <input type="range" id="nRenters"><br>
-          <div class="slider-description">Total number of people looking to rent a house.</div>
+        <div class="collapsible-content" id="simulation-box" target-object="model">
 
+        </div>
+      </div>
+
+      <div class="collapsible-box">
+        <div class="collapsible-header">House Settings <button class="collapse-button">&#9660;</button></div>
+        <div class="collapsible-content" id="house-box" target-object="model">
           <label for="nHouses">Number of Houses: <span id="nHousesValue">1000</span></label><br>
           <input type="range" id="nHouses"><br>
           <div class="slider-description">Total number of houses available for rent in the market.</div>
 
-          <label for="rentAffordability">Rent Affordability Ratio (%): <span id="rentAffordabilityValue">50</span></label><br>
-          <input type="range" id="rentAffordability" data-normalizer="percent"><br>
-          <div class="slider-description">Maximum % of income renters spend on rent.</div>
+          <label for="houseConstructionCostMean">Mean House Construction Cost ($): <span id="houseConstructionCostMeanValue">100000</span></label><br>
+          <input type="range" id="houseConstructionCostMean"<br>
+          <div class="slider-description">Average cost of constructing a house.</div>
 
-          <label for="costOfLiving">Minimum Cost of Living: <span id="costOfLivingValue">1000</span></label><br>
-          <input type="range" id="costOfLiving"><br>
-          <div class="slider-description">Base monthly living cost apart from rent.</div>
+          <label for="houseConstructionCostDispersion">House Construction Cost Dispersion (%): <span id="houseConstructionCostDispersionValue">5</span></label><br>
+          <input type="range" id="houseConstructionCostDispersion" data-normalizer="percent"><br>
+          <div class="slider-description">Dispersion of house construction cost.</div>
 
-          <label for="markup">Initial Price Markup (%): <span id="markupValue">10</span></label><br>
-          <input type="range" id="markup" data-normalizer="percent"><br>
-          <div class="slider-description">Initial price increase % landlords apply over cost.</div>
+          <label for="minHouseSalePrice">Minimum Sale Price ($): <span id="minHouseSalePriceValue">100000</span></label><br>
+          <input type="range" id="minSalePrice"<br>
+          <div class="slider-description">Minimum price for a house to be considered for sale.</div>
 
-          <label for="priceDrop">Vacancy Weekly Price Drop (%): <span id="priceDropValue">1</span></label><br>
-          <input type="range" id="priceDrop" data-normalizer="percent"><br>
-          <div class="slider-description">Rent decrease % weekly when vacant.</div>
+          <label for="refurbishingCostMean">Mean Refurbishing Cost ($): <span id="refurbishingCostValue">10000</span></label><br>
+          <input type="range" id="refurbishingCostMean" data-normalizer="yearlyRent"><br>
+          <div class="slider-description">Average cost of refurbishing a house.</div>
 
-          <label for="housesPerStep">Houses Considered per Step: <span id="housesPerStepValue">10</span></label><br>
-          <input type="range" id="housesPerStep"><br>
-          <div class="slider-description">Number of houses each renter evaluates per step.</div>
-
-          <label for="rentalDuration">Max Rental Duration (years): <span id="rentalDurationValue">5</span></label><br>
-          <input type="range" id="rentalDuration" data-normalizer="years"><br>
-          <div class="slider-description">Max number of years a renter can stay in one house.</div>
-
-          <label for="income">Average Salary: <span id="incomeValue">2000</span></label><br>
-          <input type="range" id="income"><br>
-          <div class="slider-description">Average monthly income of the renters.</div>
+          <label for="refurbishingCostDispersion">Refurbishing Cost Dispersion (%): <span id="refurbishingCostDispersionValue">5</span></label><br>
+          <input type="range" id="refurbishingCostDispersion" data-normalizer="percent"><br>
+          <div class="slider-description">Dispersion of refurbishing cost.</div>
         </div>
       </div>
 
+      <div class="collapsible-box">
+        <div class="collapsible-header">Citizen Settings <button class="collapse-button">&#9660;</button></div>
+        <div class="collapsible-content" id="citizen-box" target-object="model">
+
+          <label for="nCitizens">Number of Citizens: <span id="nCitizensValue">1000</span></label><br>
+          <input type="range" id="nCitizens"><br>
+          <div class="slider-description">Total number of people looking to rent a house.</div>
+
+          <label for="lifeStartAgeMean">Life Start Age Mean (years): <span id="lifeStartAgeMeanValue">20</span></label><br>
+          <input type="range" id="lifeStartAgeMean" data-normalizer="years" update-distributions="true"><br>
+          <div class="slider-description">Age mean at which citizens start their life.</div>
+
+          <label for="lifeStartAgeDispersion">Life Start Age Dispersion (%): <span id="lifeStartAgeDispersionValue">5</span></label><br>
+          <input type="range" id="lifeStartAgeDispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of life start age.</div>
+
+          <label for="retirementAge">Retirement Age (years): <span id="retirementAgeValue">68</span></label><br>
+          <input type="range" id="retirementAge" data-normalizer="years"><br>
+          <div class="slider-description">Age at which citizens retire.</div>
+
+          <label for="lifespanMean">Lifespan Mean (years): <span id="lifespanMeanValue">80</span></label><br>
+          <input type="range" id="lifespanMean" data-normalizer="years" update-distributions="true"><br>
+          <div class="slider-description">Average lifespan of citizens.</div>
+
+          <label for="lifespanDispersion">Lifespan Dispersion (%): <span id="lifespanDispersionValue">5</span></label><br>
+          <input type="range" id="lifespanDispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of lifespan.</div>
+
+          <div id="lifeDensities" class="distribution"></div>
+
+          <label for="salaryAt20Mean">Salary at 20 Mean ($): <span id="salaryAt20MeanValue">1.5</span></label><br>
+          <input type="range" id="salaryAt20Mean" data-normalizer="yearlyRent" update-distributions="true"><br>
+          <div class="slider-description">Average salary at age 20.</div>
+
+          <label for="salaryAt20Dispersion">Salary at 20 Dispersion (%): <span id="salaryAt20DispersionValue">5</span></label><br>
+          <input type="range" id="salaryAt20Dispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of salary at age 20.</div>
+
+          <div id="salaryAt20Density" class="distribution"></div>
+
+          <label for="lifetimeSalaryGrowthFactorMean">Lifetime Salary Growth Factor Mean (%): <span id="lifetimeSalaryGrowthFactorMeanValue">1.5</span></label><br>
+          <input type="range" id="lifetimeSalaryGrowthFactorMean" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Average growth factor of salary over lifetime.</div>
+
+          <label for="lifetimeSalaryGrowthFactorDispersion">Lifetime Salary Growth Factor Dispersion (%):
+            <span id="lifetimeSalaryGrowthFactorDispersionValue">5</span></label><br>
+          <input type="range" id="lifetimeSalaryGrowthFactorDispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of lifetime salary growth factor.</div>
+
+          <div id="lifetimeSalaryGrowthFactorDensity" class="distribution"></div>
+
+          <label for="costOfLivingBase">Base Monthly Cost of Living: <span id="costOfLivingBaseValue">1000</span></label><br>
+          <input type="range" id="costOfLivingBase" data-normalizer="monthlyRent" update-distributions="true"><br>
+          <div class="slider-description">Base monthly living cost apart from rent.</div>
+
+          <label for="costOfLivingSalaryFactor">Cost of Living Salary Factor (%): <span id="costOfLivingSalaryFactorValue">10</span></label><br>
+          <input type="range" id="costOfLivingSalaryFactor" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Cost of living increase % per salary increase.</div>
+
+          <label for="costOfLivingDispersion">Cost of Living Dispersion (%): <span id="costOfLivingDispersionValue">5</span></label><br>
+          <input type="range" id="costOfLivingDispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of cost of living.</div>
+
+          <label for="housesPerStep">Houses Considered per Step: <span id="housesPerStepValue">10</span></label><br>
+          <input type="range" id="housesPerStep"><br>
+          <div class="slider-description">Number of houses each citizen evaluates per step.</div>
+
+        </div>
+      </div>
+
+      <div class="collapsible-box">
+        <div class="collapsible-header">Renter Settings <button class="collapse-button">&#9660;</button></div>
+        <div class="collapsible-content" id="renter-box" target-object="model">
+
+          <label for="rentAffordabilityRatioMean">Mean Rent Affordability Ratio (%): <span id="rentAffordabilityRatioMeanValue">30</span></label><br>
+          <input type="range" id="rentAffordabilityRatioMean" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Maximum % of salary after discounting cost of living, citizens would spend on housing.</div>
+
+          <label for="rentAffordabilityRatioDispersion">Rent Affordability Ratio Dispersion (%): <span id="rentAffordabilityRatioDispersionValue">5</span></label><br>
+          <input type="range" id="rentAffordabilityRatioDispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of rent affordability ratio.</div>
+
+          <div id="rentAffordabilityRatioDensity" class="distribution"></div>
+
+          <label for="rentalDurationMean">Mean Rental Duration (years): <span id="rentalDurationMeanValue">5</span></label><br>
+          <input type="range" id="rentalDurationMean" data-normalizer="years"><br>
+          <div class="slider-description">Max number of years a citizen can stay renting the same house.</div>
+
+          <label for="rentalDurationDispersion">Rental Duration Dispersion (%): <span id="rentalDurationDispersionValue">5</span></label><br>
+          <input type="range" id="rentalDurationDispersion" data-normalizer="percent"><br>
+          <div class="slider-description">Dispersion of rental duration.</div>
+
+          <div id="rentalDurationDensity" class="distribution"></div>
+
+        </div>
+      </div>
+
+      <div class="collapsible-box">
+        <div class="collapsible-header">Owner Settings <button class="collapse-button">&#9660;</button></div>
+        <div class="collapsible-content" id="owner-box" target-object="model">
+
+          <div for="homeBuyingAgeMean" >Mean Home Buying Age (years): <span id="homeBuyingAgeMeanValue">30</span></div>
+          <input type="range" id="homeBuyingAgeMean" data-normalizer="years" update-distributions="true"><br>
+          <div class="slider-description">Average age at which citizens start considering buying a home.</div>
+
+          <div for="homeBuyingAgeDispersion">Home Buying Age Dispersion (%): <span id="homeBuyingAgeDispersionValue">5</span></div>
+          <input type="range" id="homeBuyingAgeDispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of home buying age.</div>
+
+          <div id="homeBuyingAgeDensity" class="distribution">Graph missing here: homeBuyingAgeDensity</div>
+
+          <label for="mortgateAffordabilityRatioMean">Mean Mortgage Affordability Ratio (%): <span id="mortgageAffordabilityRatioMeanValue">30</span></label><br>
+          <input type="range" id="mortgageAffordabilityRatioMean" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Maximum % of salary after discounting cost of living, citizens would spend on mortgage.</div>
+
+          <label for="mortgageAffordabilityRatioDispersion">Mortgage Affordability Ratio Dispersion (%): <span id="mortgageAffordabilityRatioDispersionValue">5</span></label><br>
+          <input type="range" id="mortgageAffordabilityRatioDispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of mortgage affordability ratio.</div>
+
+        </div>
+      </div>
+
+      <div class="collapsible-box">
+        <div class="collapsible-header">Investor/Landlord Settings <button class="collapse-button">&#9660;</button></div>
+        <div class="collapsible-content" id="investor-box" target-object="model">
+
+          <label for="surplusSavingRateMean">Mean Surplus Saving Rate (%): <span id="surplusSavingRateMeanValue">10</span></label><br>
+          <input type="range" id="surplusSavingRateMean" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Ratio of salary citizens save each month after deducting expenses.</div>
+
+          <label for="surplusSavingRateDispersion">Surplus Saving Rate Dispersion (%): <span id="surplusSavingRateDispersionValue">5</span></label><br>
+          <input type="range" id="surplusSavingRateDispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of surplus saving rate.</div>
+
+          <label for="rentalInvestmentRateMean">Mean Rental Investment Rate (%): <span id="rentalInvestmentRateMeanValue">10</span></label><br>
+          <input type="range" id="rentalInvestmentRateMean" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Ratio of surplus savings citizens invest in rental properties.</div>
+
+          <label for="rentalInvestmentRateDispersion">Rental Investment Rate Dispersion (%): <span id="rentalInvestmentRateDispersionValue">5</span></label><br>
+          <input type="range" id="rentalInvestmentRateDispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of rental investment rate.</div>
+
+          <div id="surplusSavingRateDensity" class="distribution"></div>
+
+          <label for="minAcceptableExcessYieldMean">Mean Minimum Acceptable Excess Yield (%): <span id="minAcceptableExcessYieldMeanValue">2</span></label><br>
+          <input type="range" id="minAcceptableExcessYieldMean" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Mean minimum excess yield investors require to consider a rental property.</div>
+
+          <label for="minAcceptableExcessYieldDispersion">Minimum Acceptable Excess Yield Dispersion (%): <span id="minAcceptableExcessYieldDispersionValue">5</span></label><br>
+          <input type="range" id="minAcceptableExcessYieldDispersion" data-normalizer="percent" update-distributions="true"><br>
+          <div class="slider-description">Dispersion of minimum acceptable excess yield.</div>
+
+          <div id="minAcceptableExcessYieldDensity" class="distribution"></div>
+
+          <label for="saleMarkup">Initial Sale Price Markup (%): <span id="saleMarkupValue">10</span></label><br>
+          <input type="range" id="saleMarkup" data-normalizer="percent"><br>
+          <div class="slider-description">Initial price increase % landlords apply over current average selling price.</div>
+
+          <label for="rentMarkup">Initial Rent Price Markup (%): <span id="rentMarkupValue">10</span></label><br>
+          <input type="range" id="rentMarkup" data-normalizer="percent"><br>
+          <div class="slider-description">Initial price increase % landlords apply over current average renting price.</div>
+
+          <label for="salePriceDrop">Vacancy Weekly Price Drop (%): <span id="salePriceDropValue">1</span></label><br>
+          <input type="range" id="salePriceDrop" data-normalizer="percent"><br>
+          <div class="slider-description">Sale price decrease % weekly when vacant.</div>
+
+          <label for="rentPriceDrop">Vacancy Weekly Price Drop (%): <span id="rentPriceDropValue">1</span></label><br>
+          <input type="range" id="rentPriceDrop" data-normalizer="percent"><br>
+          <div class="slider-description">Rent price decrease % weekly when vacant.</div>
+
+        </div>
+      </div>
+
+      <div class="collapsible-box">
+        <div class="collapsible-header">Money Settings<button class="collapse-button">&#9660;</button></div>
+        <div class="collapsible-content" id="money-box" target-object="model">
+
+          <label for="maxMortgageDuration">Maximum Mortgage Duration (years): <span id="maxMortgageDurationValue">30</span></label><br>
+          <input type="range" id="maxMortgageDuration" data-normalizer="years"><br>
+          <div class="slider-description">Maximum duration of a mortgage.</div>
+
+          <label for="mortgageRate">Mortgage Rate (%): <span id="mortgageRateValue">5</span></label><br>
+          <input type="range" id="mortgageRate" data-normalizer="percent"><br>
+          <div class="slider-description">Interest rate of a mortgage.</div>
+
+          <label for="maxMortgageAge">Maximum Mortgage Age (years): <span id="maxMortgageAgeValue">40</span></label><br>
+          <input type="range" id="maxMortgageAge" data-normalizer="years" min="1" max="100" step="1"><br>
+          <div class="slider-description">The maximum age at which a citizen is eligible to complete mortgage payments.</div>
+
+          <label for="maxMortgageLoanToValue">Maximum Mortgage Loan to Value (%): <span id="maxMortgageLoanToValueValue">80</span></label><br>
+          <input type="range" id="maxMortgageLoanToValue" data-normalizer="percent"><br>
+          <div class="slider-description">Maximum percentage of the house value that can be financed with a mortgage.</div>
+        </div>
+      </div>
     </div>
 
     <div class="plot-container">
       <div id="housesVsTime" class="plot"></div>
-      <div id="rentVsTime" class="plot"></div>
+      <div id="citizensVsTime" class="plot"></div>
+      <div id="rentPriceVsTime" class="plot"></div>
+      <div id="salePriceVsTime" class="plot"></div>
+      <div id="salaryVsTime" class="plot"></div>
       <div id="vacantTime" class="plot"></div>
     </div>
 
     <div class="plot-container">
       <div id="rentPriceHist" class="plot"></div>
       <div id="rentLengthHist" class="plot"></div>
-      <div id="incomeHist" class="plot"></div>
+      <div id="salaryHist" class="plot"></div>
+      <div id="ageHist" class="plot"></div>
+      <div id="ownedHousesHist" class="plot"></div>
+      <div id="salaryVsAge" class="plot"></div>
     </div>
 
     <script>

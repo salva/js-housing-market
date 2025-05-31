@@ -32,128 +32,286 @@ function mapAndMean(iterable, func) {
     return null;
 }
 
-class Citizen {
-    constructor(id, tick, incomeFactor, age) {
-        this.id = id;
-        this.createdTick = tick;
-        this.changedTick = tick;
-        this.incomeFactor = incomeFactor;
-        this.age = age;
-        this.house = null;
+function arrayRemoveAt(array, ix) {
+    array[ix] = array[array.length - 1];
+    array.pop();
+}
+
+function computeWeeklyMortgagePayment(principal, annualInterestRate, weeks) {
+    if (annualInterestRate === 0) {
+        return principal / weeks;
+    }
+
+    const weeklyRate = annualInterestRate / 52;
+    return principal * weeklyRate / (1 - Math.pow(1 + weeklyRate, -weeks))
+}
+
+function betaSample(min, max, mean, dispersion) {
+    // console.log(`betaSample(${min}, ${max}, ${mean}, ${dispersion})`);
+    if (mean <= min || mean >= max) {
+        throw new Error("mean must be between min and max");
+    }
+    if (dispersion <= 0 || dispersion >= 1) {
+        throw new Error("dispersion must be in (0, 1)");
+    }
+
+    const mean01 = (mean - min) / (max - min);
+    const factor = (1 - dispersion) / dispersion;
+    const alpha = mean01 * factor;
+    const beta = (1 - mean01) * factor;
+
+    // console.log(`Computed parameters for beta distribution - mean01: ${mean01}, factor: ${factor}, alpha: ${alpha}, beta: ${beta}`);
+
+    const sample01 = jStat.beta.sample(alpha, beta);
+    const sample = min + (max - min) * sample01;
+
+    // console.log(`Sample from beta distribution - sample01: ${sample01}, sampled value: ${sample}`);
+
+    return sample;
+}
+
+function shiftedGammaSample(shift, mean, dispersion) {
+    // console.log(`shiftedGammaSample(shift: ${shift}, mean: ${mean}, dispersion: ${dispersion})`);
+    if (mean <= shift) {
+        throw new Error("mean must be above the shift");
+    }
+    if (dispersion <= 0 || dispersion >= 1) {
+        if (dispersion === 0) { return mean; }
+        throw new Error("dispersion must be in (0, 1)");
+    }
+
+    const std = dispersion * (mean - shift);
+    const k = Math.pow((mean - shift) / std, 2);
+    const theta = Math.pow(std, 2) / (mean - shift);
+
+    const sample = jStat.gamma.sample(k, theta) + shift; // shift to match the original range
+    // console.log(`shiftedGammaSample std: ${std}, k: ${k}, theta: ${theta}, sample: ${sample}`);
+
+    return sample;
+}
+
+class Thing {
+    static nextId = 0;
+
+    constructor(state, tick) {
+        this.previousState = "_beforeNew";
+        this.state = state;
+        this.id = Thing.nextId;
+        Thing.nextId += 1;
+
+        this.creationTick = tick;
+        this.lastStateChangeTick = tick;
+        this.lastStateChangeTickGap = 0;
+    }
+
+    newState(state, tick) {
+        if (this.state !== state) {
+            if (tick > this.lastStateChangeTick) {
+                this.previousState = this.state;
+                this.lastStateChangeTickGap = tick - this.lastStateChangeTick;
+                this.lastStateChangeTick = tick;
+            }
+            this.state = state;
+        }
     }
 }
 
-class House {
-    constructor(id, tick, rentalPrice, salePrice) {
-        this.id = id;
-        this.createdTick = tick;
-        this.changedTick = tick;
+class Citizen extends Thing {
+    constructor(tick, lifeStartAge, lifespan, retirementAge,
+                salaryAt20, lifetimeSalaryGrowthFactor,
+                costOfLivingBase, costOfLivingSalaryFactor,
+                rentalAffordabilityRatio, mortgageAffordabilityRatio,
+                surplusSavingRate, rentalInvestmentRate,
+                homeBuyingAge) {
+        super("_new", tick)
+        this.lifeStart = tick - lifeStartAge;
+        this.lifeStartAge = lifeStartAge;
+        this.lifespan = lifespan;
+        this.workingEnd = tick + retirementAge - lifeStartAge;
+        this.lifeEnd = tick + lifespan - lifeStartAge;
+        this.salaryAt20 = salaryAt20;
+        this.lifetimeSalaryGrowthFactor = lifetimeSalaryGrowthFactor;
+        this.costOfLivingBase = costOfLivingBase;
+        this.costOfLivingSalaryFactor = costOfLivingSalaryFactor;
+        this.rentalAffordabilityRatio = rentalAffordabilityRatio;
+        this.mortgageAffordabilityRatio = mortgageAffordabilityRatio;
+        this.surplusSavingRate = surplusSavingRate;
+        this.rentalInvestmentRate = rentalInvestmentRate;
+        this.homeBuyingAge = homeBuyingAge;
+        this.homeBuyingTick = tick + homeBuyingAge - lifeStartAge;
+        this.savings = 0;
+        this.ownedHouses = [];
+        this.residence = null;
+        this.salary = 0;
+        this.costOfLiving = 0;
+        this.salaryAvailableForRent = 0;
+        this.salaryAvailableForMortgage = 0;
+
+        console.log(`new citizen: id: ${this.id}, lifeStart: ${this.lifeStart}, lifespan: ${this.lifespan}, retirementAge: ${retirementAge}, workingEnd: ${this.workingEnd}, lifeEnd: ${this.lifeEnd}, salaryAt20: ${salaryAt20}, lifetimeSalaryGrowthFactor: ${lifetimeSalaryGrowthFactor}, costOfLivingBase: ${costOfLivingBase}, costOfLivingSalaryFactor: ${costOfLivingSalaryFactor}, surplusSavingRate: ${surplusSavingRate}, rentalInvestmentRate: ${rentalInvestmentRate}, homeBuyingAge: ${homeBuyingAge}`);
+
+    }
+}
+
+class House extends Thing {
+    constructor(tick, salePrice) {
+        super("_new", tick);
         this.rentalEnd = 0;
         this.owner = null;
-        this.renter = null;
-        this.status = 'new';
-        this.setRentalPrice(rentalPrice);
-        this.setSalePrice(salePraice)
+        this.resident = null;
+        this.salePrice = salePrice;
+        this.rentPrice = null;
+        this.mortagePayment = 0;
+        this.mortageEnd = 0;
+        this.lastBuyPrice = null;
+        this.lastFullBuyPrice = null;
     }
+}
 
-    setRentalPrice(newRentalPrice) {
-        this.rentalPrice = Math.max(newRentalPrice, 1);
-    }
-
-    setSalePrice(newSalePrice) {
-        this.salePrice = Math.max(newSalePrice, 1);
+class Vulture extends Thing {
+    constructor(tick) {
+        super("scavenging", tick);
+        this.ownedHouses = []
     }
 }
 
 class HousingMarket {
-    constructor(nCitizens=0,
-                nHouses=0,
-                rentAffordability=0.2,
-                costOfLiving=100,
-                markup=0.2,
-                priceDrop=0.02,
-                housesConsideredPerStep=10,
-                rentalDurationMin=1,
-                rentalDurationMax=200,
-                meanIncome=1000) {
-
+    constructor() {
         this.tick = 0;
         this.citizens = {}
         this.nCitizens = 0;
         this.houses = {};
         this.nHouses = 0;
+
         this.citizensLooking = new Set();
         this.citizensRenting = new Set();
-        this.citizensOwning = new Set();
-        this.housesNew = new Set();
+        this.citizensOwningTheirHomes = new Set();
+
         this.housesForRent = new Set();
         this.housesForSale = new Set();
         this.housesRented = new Set();
-        this.housesOwnerOccupied = new Set();
-        this.housesSecondHouse = new Set();
+        this.housesOccupiedByOwner = new Set();
 
-        this.lastId = 0;
+        this.savingsRatio = 0.2;
+        this.costOfLivingBase = 100;
+        this.costOfLivingSalaryFactor = 0.2;
+        this.costOfLivingDispersion = 0.2;
+        this.rentMarkup = 0.20;
+        this.rentOverload = 0.03;
+        this.saleMarkup = 0.10;
+        this.rentPriceDrop = 0.07;
+        this.salePriceDrop = 0.01;
+        this.housesConsideredPerStep = 10;
+        this.nextCityRentPriceRatio = 0.3;
 
-        this.rentAffordability = rentAffordability;
-        this.costOfLiving = costOfLiving;
-        this.markup = markup;
-        this.priceDrop = priceDrop;
-        this.housesConsideredPerStep = housesConsideredPerStep;
-        this.rentalDurationMin = rentalDurationMin;
-        this.rentalDurationMax = rentalDurationMax;
-        this.meanIncome = meanIncome;
+        this.moneyDepositRate = 0.02;
 
-        this.adjustPopulation(nCitizens);
-        this.adjustHousing(nHouses);
+        this.mortgageRate = 0.04;
+        this.maxMortgageDuration = 30 * 52;
+        this.maxMortgageAge = 75 * 52;
+        this.maxMortgageLoanToValue = 0.8;
+        this.buyingTaxes = 0.08;
+        this.fixedBuyingCosts = 1000;
+        this.mortgageWeight = 0.8;
 
-        this.stdAge = 10;
-        this.meanAge = 30;
+        this.salaryAt20Min = 5000;
+        this.salaryAt20Mean = 20000;
+        this.salaryAt20Dispersion = 0.2;
+        this.lifetimeSalaryGrowthFactorMin = 1;
+        this.lifetimeSalaryGrowthFactorMean = 3;
+        this.lifetimeSalaryGrowthFactorDispersion = 0.2;
+        this.afterRetirementSalaryFactorMean = 0.8;
 
-        this.incomeFactorCv = 0.3;
-        this.incomeFactorSigma2 = -Math.log(1 - Math.pow(this.incomeFactorCv, 2));
-        this.incomeFactorSigma = Math.sqrt(this.incomeFactorSigma2);
-        this.incomeFactorMu = -this.incomeFactorSigma2 / 2;
+        this.rentAffordabilityRatioMean = 0.3;
+        this.rentAffordabilityRatioDispersion = 0.1;
+        this.mortgageAffordabilityRatioMean = 0.3;
+        this.mortgageAffordabilityRatioDispersion = 0.1;
 
-        // Parameters for beta distribution used to model rental durations.
-        this.rentalDurationBetaAlpha = 5;
-        this.rentalDurationBetaBeta = 2;
+        this.surplusSavingRateMean = 0.2;
+        this.surplusSavingRateDispersion = 0.2;
+        this.rentalInvestmentRateMean = 0.2;
+        this.rentalInvestmentRateDispersion = 0.2;
+        this.minAcceptableExcessYieldMean = 0.02;
+        this.minAcceptableExcessYieldDispersion = 0.1;
 
-        this.initialRentalPrice = 1000.0;
-        this.currentRentalPrice = this.initialRentalPrice;
-        this.currentRentalPriceWeight = 100.0;
-        this.currentRentalPriceAmortizationFactor = 0.9;
+        this.rentalDurationMean = 52 * 12; // 1 year
+        this.rentalDurationDispersion = 0.2; // 20% dispersion
+
+        this.homeBuyingAgeMin = 18 * 52; // 18 years
+        this.homeBuyingAgeMean = 30 * 52; // 30 years
+        this.homeBuyingAgeDispersion = 0.25; // 20% dispersion
+
+        this.currentRentPrice = null;
+        this.currentRentPriceWeight = 0;
+        this.currentRentPriceAmortizationFactor = 0.9;
+
+        this.initialSalePrice = 250000.0;
+        this.currentSalePrice = null;
+        this.currentSalePriceWeight = 0;
+        this.currentSalePriceAmortizationFactor = 0.9;
+
+        this.houseAmortizedMaintenanceCost = 0; //100;
+
+        this.minStartLifeAge = 20 * 52;
+        this.maxStartLifeAge = 105 * 52;
+        this.meanStartLifeAge = 28 * 52;
+        this.dispersionStartLifeAge = 0.05;
+        this.retirementAge = 68 * 52;
+
+        this.minLifespan = 20 * 52;
+        this.maxLifespan = 105 * 52;
+        this.meanLifespan = 80 * 52;
+        this.dispersionLifespan = 0.05;
 
         this.housesRentedInTick = [];
+        this.housesBoughtInTick = [];
     }
 
     setNCitizens(val) {
         console.log(`Number of Citizens changed from ${this.nCitizens} to ${val}`);
-        this.adjustPopulation(val);
+        this.nCitizens = val;
     }
 
     setNHouses(val) {
         console.log(`Number of Houses changed from ${this.nHouses} to ${val}`);
-        this.adjustHousing(val);
+        this.nHouses = val;
     }
 
-    setRentAffordability(val) {
-        console.log(`Rent Affordability changed from ${this.rentAffordability} to ${val}`);
-        this.rentAffordability = val;
+    setSavingsRatio(val) {
+        console.log(`Savings Ratio changed from ${this.savingsRatio} to ${val}`);
+        this.savingsRatio = val;
     }
 
-    setCostOfLiving(val) {
+    setCostOfLivingBase(val) {
         console.log(`Cost of Living changed from ${this.costOfLiving} to ${val}`);
-        this.costOfLiving = val;
+        this.costOfLivingBase = val;
+    }
+    setCostOfLivingSalaryFactor(val) {
+        console.log(`Cost of Living Salary Factor changed from ${this.costOfLivingSalaryFactor} to ${val}`);
+        this.costOfLivingSalaryFactor = val;
+    }
+    setCostOfLivingDispersion(val) {
+        console.log(`Cost of Living Dispersion changed from ${this.costOfLivingDispersion} to ${val}`);
+        this.costOfLivingDispersion = val;
     }
 
-    setMarkup(val) {
-        console.log(`Markup changed from ${this.markup} to ${val}`);
-        this.markup = val;
+    setSaleMarkup(val) {
+        console.log(`SaleMarkup changed from ${this.saleMarkup} to ${val}`);
+        this.saleMarkup = val;
     }
 
-    setPriceDrop(val) {
-        console.log(`Price Drop changed from ${this.priceDrop} to ${val}`);
-        this.priceDrop = val;
+    setRentMarkup(val) {
+        console.log(`RentMarkup changed from ${this.rentMarkup} to ${val}`);
+        this.rentMarkup = val;
+    }
+
+    setSalePriceDrop(val) {
+        console.log(`Sale Price Drop changed from ${this.salePriceDrop} to ${val}`);
+        this.salePriceDrop = val;
+    }
+
+    setRentPriceDrop(val) {
+        console.log(`Rent Price Drop changed from ${this.rentPriceDrop} to ${val}`);
+        this.rentPriceDrop = val;
     }
 
     setHousesPerStep(val) {
@@ -161,258 +319,869 @@ class HousingMarket {
         this.housesPerStep = val;
     }
 
-    setRentalDuration(val) {
-        console.log(`Max Rental Duration changed from ${this.rentalDurationMax} to ${val}`);
-        this.rentalDurationMax = val;
+    setRentalDurationMean(val) {
+        console.log(`Rental Duration Mean changed from ${this.rentalDurationMean} to ${val}`);
+        this.rentalDurationMean = val;
+    }
+    setRentalDurationDispersion(val) {
+        console.log(`Rental Duration Dispersion changed from ${this.rentalDurationDispersion} to ${val}`);
+        this.rentalDurationDispersion = val;
     }
 
-    setIncome(val) {
-        console.log(`Salary changed from ${this.meanIncome} to ${val}`);
-        this.meanIncome = val;
+    setLifespanMean(val) {
+        console.log(`Lifespan Mean changed from ${this.meanLifespan} to ${val}`);
+        this.meanLifespan = val;
+    }
+    setLifespanDispersion(val) {
+        console.log(`Lifespan Dispersion changed from ${this.dispersionLifespan} to ${val}`);
+        this.dispersionLifespan = val;
     }
 
-    setShowTicks(val) {
-        console.log(`Show Ticks changed from ${this.showTicks} to ${val}`);
-        this.showTicks = val;
+    setLifespanMin(val) {
+        console.log(`Lifespan Min changed from ${this.minLifespan} to ${val}`);
+        this.minLifespan = val;
+    }
+    setLifespanMax(val) {
+        console.log(`Lifespan Max changed from ${this.maxLifespan} to ${val}`);
+        this.maxLifespan = val;
     }
 
-    setUpdateSpeed(val) {
-        console.log(`Update Speed changed from ${this.updateSpeed} to ${val}`);
-        this.updateSpeed = val;
+    setLifeStartAgeMean(val) {
+        console.log(`Life Start Age Mean changed from ${this.meanStartLifeAge} to ${val}`);
+        this.meanStartLifeAge = val;
+    }
+    setLifeStartAgeDispersion(val) {
+        console.log(`Life Start Age Dispersion changed from ${this.dispersionStartLifeAge} to ${val}`);
+        this.dispersionStartLifeAge = val;
+    }
+    setLifeStartAgeMin(val) {
+        console.log(`Life Start Age Min changed from ${this.minStartLifeAge} to ${val}`);
+        this.minStartLifeAge = val;
+    }
+    setLifeStartAgeMax(val) {
+        console.log(`Life Start Age Max changed from ${this.maxStartLifeAge} to ${val}`);
+        this.maxStartLifeAge = val;
     }
 
-    incomeFactorLogNormal() {
-        return jStat.lognormal.sample(this.incomeFactorMu, this.incomeFactorSigma);
+    setRetirementAge(val) {
+        console.log(`Retirement Age changed from ${this.retirementAge} to ${val}`);
+        this.retirementAge = val;
     }
 
-    addCitizen(age, incomeFactor) {
-        this.lastId += 1;
-        const citizen = new Citizen(this.lastId, this.tick, incomeFactor, age);
-        this.citizens[this.lastId] = citizen;
-        this.citizensLooking.add(this.lastId);
-        return this.lastId;
+    setSalaryAt20Min(val) {
+        console.log(`Salary At 20 Min changed from ${this.salaryAt20Min} to ${val}`);
+        this.salaryAt20Min = val;
+    }
+    setSalaryAt20Mean(val) {
+        console.log(`Salary At 20 Mean changed from ${this.salaryAt20Mean} to ${val}`);
+        this.salaryAt20Mean = val;
+    }
+    setSalaryAt20Dispersion(val) {
+        console.log(`Salary At 20 Dispersion changed from ${this.salaryAt20Dispersion} to ${val}`);
+        this.salaryAt20Dispersion = val;
     }
 
-    addHouse(rentalPrice) {
-        this.lastId += 1;
-        const house = new House(this.lastId, this.tick, rentalPrice);
-        this.houses[this.lastId] = house;
-        this.housesForRent.add(this.lastId);
-        return this.lastId;
+    setLifetimeSalaryGrowthFactorMin(val) {
+        console.log(`Lifetime Salary Growth Factor Min changed from ${this.lifetimeSalaryGrowthFactorMin} to ${val}`);
+        this.lifetimeSalaryGrowthFactorMin = val;
     }
 
-    makeRentingContract(citizen, house, ttl) {
-        if (house.renter) {
-            throw new Error("House is already rented");
+    setLifetimeSalaryGrowthFactorMean(val) {
+        console.log(`Lifetime Salary Growth Factor Mean changed from ${this.lifetimeSalaryGrowthFactorMean} to ${val}`);
+        this.lifetimeSalaryGrowthFactorMean = val;
+    }
+    setLifetimeSalaryGrowthFactorDispersion(val) {
+        console.log(`Lifetime Salary Growth Factor Dispersion changed from ${this.lifetimeSalaryGrowthFactorDispersion} to ${val}`);
+        this.lifetimeSalaryGrowthFactorDispersion = val;
+    }
+
+    setRentAffordabilityRatioMean(val) {
+        console.log(`Rent Affordability Ratio Mean changed from ${this.rentAffordabilityRatioMean} to ${val}`);
+        this.rentAffordabilityRatioMean = val;
+    }
+
+    setRentAffordabilityRatioDispersion(val) {
+        console.log(`Rent Affordability Ratio Dispersion changed from ${this.rentAffordabilityRatioDispersion} to ${val}`);
+        this.rentAffordabilityRatioDispersion = val;
+    }
+
+    setMortgageAffordabilityRatioMean(val) {
+        console.log(`Mortgage Affordability Ratio Mean changed from ${this.mortgageAffordabilityRatioMean} to ${val}`);
+        this.mortgageAffordabilityRatioMean = val;
+    }
+
+    setMortgageAffordabilityRatioDispersion(val) {
+        console.log(`Mortgage Affordability Ratio Dispersion changed from ${this.mortgageAffordabilityRatioDispersion} to ${val}`);
+        this.mortgageAffordabilityRatioDispersion = val;
+    }
+
+    setSurplusSavingRateMean(val) {
+        console.log(`Surplus Saving Rate Mean changed from ${this.surplusSavingRateMean} to ${val}`);
+        this.surplusSavingRateMean = val;
+    }
+
+    setSurplusSavingRateDispersion(val) {
+        console.log(`Surplus Saving Rate Dispersion changed from ${this.surplusSavingRateDispersion} to ${val}`);
+        this.surplusSavingRateDispersion = val;
+    }
+
+    setRentalInvestmentRateMean(val) {
+        console.log(`Rental Investment Rate Mean changed from ${this.rentalInvestmentRateMean} to ${val}`);
+        this.rentalInvestmentRateMean = val;
+    }
+
+    setRentalInvestmentRateDispersion(val) {
+        console.log(`Rental Investment Rate Dispersion changed from ${this.rentalInvestmentRateDispersion} to ${val}`);
+        this.rentalInvestmentRateDispersion = val;
+    }
+
+    setMortgageRate(val) {
+        console.log(`Mortgage Rate changed from ${this.mortgageRate} to ${val}`);
+        this.mortgageRate = val;
+    }
+    setMaxMortgageDuration(val) {
+        console.log(`Max Mortgage Duration changed from ${this.maxMortgageDuration} to ${val}`);
+        this.maxMortgageDuration = val;
+    }
+
+    setMaxMortgageAge(val) {
+        console.log(`Max Mortgage Age changed from ${this.maxMortgageAge} to ${val}`);
+        this.maxMortgageAge = val;
+    }
+
+    setMaxMortgageLoanToValue(val) {
+        console.log(`Max Mortgage Loan To Value changed from ${this.maxMortgageLoanToValue} to ${val}`);
+        this.maxMortgageLoanToValue = val;
+    }
+
+    setHomeBuyingAgeMin(val) {
+        console.log(`Home Buying Age Min changed from ${this.homeBuyingAgeMin} to ${val}`);
+        this.homeBuyingAgeMin = val;
+    }
+
+    setHomeBuyingAgeMean(val) {
+        console.log(`Home Buying Age Mean changed from ${this.homeBuyingAgeMean} to ${val}`);
+        this.homeBuyingAgeMean = val;
+    }
+
+    setHomeBuyingAgeDispersion(val) {
+        console.log(`Home Buying Age Dispersion changed from ${this.homeBuyingAgeDispersion} to ${val}`);
+        this.homeBuyingAgeDispersion = val;
+    }
+
+    setMinAcceptableExcessYieldMean(val) {
+        console.log(`Min Acceptable Excess Yield Mean changed from ${this.minAcceptableExcessYieldMean} to ${val}`);
+        this.minAcceptableExcessYieldMean = val;
+    }
+
+    setMinAcceptableExcessYieldDispersion(val) {
+        console.log(`Min Acceptable Excess Yield Dispersion changed from ${this.minAcceptableExcessYieldDispersion} to ${val}`);
+        this.minAcceptableExcessYieldDispersion = val;
+    }
+
+    setHouseRentPrice(house) {
+        const oldRentPrice = house.rentPrice;
+        const refRentPrice = (this.currentRentPrice ?? (house.lastBuyPrice * (this.moneyDepositRate / 52) * (1 + this.rentOverload)));
+        const stddev = this.rentMarkup * 0.2;
+        house.rentPrice = Math.max(1.0, refRentPrice * jStat.normal.sample(1.0 + this.rentMarkup, stddev));
+        // console.log(`setHouseRentPrice: house ${house.id}, oldRentPrice: ${oldRentPrice}, newRentPrice: ${house.rentPrice}, refRentPrice: ${refRentPrice}, rentMarkup: ${this.rentMarkup}, currentRentPrice: ${this.currentRentPrice}, lastBuyPrice: ${house.lastBuyPrice}, moneyDepositRate: ${this.moneyDepositRate}, stddev: ${stddev}`);
+    }
+
+    setHouseSalePrice(house) {
+        const rentPrice = house.rentPrice;
+        if ((rentPrice !== null) && (rentPrice > 0)) {
+            // TODO: this algorithm needs improvement, it should take more factors into account
+            house.salePrice = rentPrice * 52 / this.moneyDepositRate * (1 + this.saleMarkup);
+        }
+        if (this.currentSalePrice === null) {
+            // if (house.salePrice === null) {
+            house.salePrice = this.initialSalePrice;
+            // }
+        }
+        else {
+            house.salePrice = this.currentSalePrice * (1 + this.saleMarkup);
+        }
+        // console.log(`setHouseSalePrice: house ${house.id}, rentPrice: ${house.rentPrice}, salePrice: ${house.salePrice}, amortized maintenance cost: ${this.houseAmortizedMaintenanceCost}, rentPrice: ${rentPrice}, money deposit rate: ${this.moneyDepositRate}, saleMarkup: ${this.saleMarkup}, currentSalePrice: ${this.currentSalePrice}`);
+    }
+
+    setHouseState(house, state) {
+        const oldState = house.state;
+        if (state !== oldState) {
+
+            //if (oldState === "rented") {
+            //    console.trace(`House ${house.id} is being set to state ${state} from rented, remaining ticks: ${house.rentalEnd - this.tick}`);
+            //}
+
+            const id = house.id;
+            this.housesForRent.delete(id);
+            this.housesForSale.delete(id);
+            this.housesRented.delete(id);
+            this.housesOccupiedByOwner.delete(id);
+            if (state === "forSale") {
+                this.housesForSale.add(house.id);
+                this.setHouseSalePrice(house);
+            }
+            else if (state === "forRent") {
+                this.housesForRent.add(house.id);
+                this.setHouseRentPrice(house);
+            }
+            else if (state === "forSaleOrRent") {
+                this.housesForSale.add(house.id);
+                this.setHouseSalePrice(house);
+                this.housesForRent.add(house.id);
+                this.setHouseRentPrice(house);
+            }
+            else if (state === "rented") {
+                this.housesRented.add(house.id);
+            }
+            else if (state === "occupiedByOwner") {
+                this.housesOccupiedByOwner.add(house.id);
+            }
+            else if (state === "removed") {
+                // The bulldozer has come
+                delete this.houses[house.id];
+            }
+            else {
+                console.warn("Unknown house state: " + state);
+            }
+            house.newState(state, this.tick);
+        }
+    }
+
+    setCitizenState(citizen, state) {
+        const oldState = citizen.state;
+        if (state !== oldState) {
+            const id = citizen.id;
+            this.citizensLooking.delete(id);
+            this.citizensRenting.delete(id);
+            this.citizensOwningTheirHomes.delete(id);
+            if (state === "looking") {
+                this.citizensLooking.add(citizen.id);
+                // this.setCitizenAims(citizen);
+            }
+            else if (state === "renting") {
+                this.citizensRenting.add(citizen.id);
+            }
+            else if (state === "ownsHisHome") {
+                this.citizensOwningTheirHomes.add(citizen.id);
+            }
+            else if (state === "removed") {
+                // Requiescat in pace
+                delete this.citizens[citizen.id];
+            }
+            else {
+                console.warn("Unknown citizen state: " + state);
+            }
+            citizen.newState(state, this.tick);
+        }
+    }
+
+    addHouse() {
+        const house = new House(this.tick);
+        console.log("Adding house " + house.id +" (" + house + ")");
+        this.houses[house.id] = house;
+        this.setHouseState(house, "forSale");
+    }
+
+    makeRentingContract(citizen, house, rentalDuration) {
+        if (house.resident) {
+            throw new Error("House is already occupied");
         }
 
-        if (citizen.house) {
-            throw new Error("Citizen is already renting a house");
+        if (citizen.residence) {
+            throw new Error("Citizen already has a home");
         }
 
-        house.renter = citizen;
-        citizen.house = house;
-        citizen.lookingTime = this.tick - citizen.changedTick;
-        citizen.changedTick = this.tick;
-        house.vacantTime = this.tick - house.changedTick;
-        house.rentingTime = ttl;
-        house.changedTick = this.tick
-        house.rentalEnd = this.tick + ttl;
+        if (house.owner == null) {
+            throw new Error("A house can not be rented unless it belongs to somebody");
+        }
 
-        this.citizensRenting.add(citizen.id);
-        this.citizensLooking.delete(citizen.id);
-        this.housesForRent.delete(house.id);
-        this.housesRented.add(house.id);
+        citizen.residence = house;
+        house.resident = citizen;
+
+        house.rentalDuration = rentalDuration;
+        house.rentalEnd = this.tick + rentalDuration;
+
+        this.setHouseState(house, "rented");
+        this.setCitizenState(citizen, "renting");
 
         this.housesRentedInTick.push(house);
     }
 
-    endRenting(house, newRentalPrice = null) {
-        const citizen = house.renter;
-        if (citizen) {
-            this.citizenUnrent(citizen);
-            this.citizensRenting.delete(citizen.id);
-            this.citizensLooking.add(citizen.id);
-            this.houseUnrent(house);
-            this.housesRented.delete(house.id);
-            this.housesForRent.add(house.id);
-            if (newRentalPrice !== null) {
-                house.setRentalPrice(newRentalPrice);
+    endRentingContract(house) {
+        const resident = house.resident;
+        if (resident === null) {
+            console.warn("endRentingContract for house " + house.id + " with no resident");
+            return;
+        }
+        if (resident.state !== "renting") {
+            console.warn("endRentingContract for not rented house " + house.id);
+            return;
+        }
+
+        const citizen = house.resident;
+        citizen.residence = null;
+
+        house.resident = null;
+        // house.rentalEnd = 0;
+
+        this.setHouseState(house, "forSaleOrRent");
+        this.setCitizenState(citizen, "looking");
+    }
+
+    randomLifeStartAge() {
+        return betaSample(this.minStartLifeAge, this.maxStartLifeAge, this.meanStartLifeAge, this.dispersionStartLifeAge);
+    }
+
+    randomLifespan() {
+        return betaSample(this.minLifespan, this.maxLifespan, this.meanLifespan, this.dispersionLifespan);
+    }
+
+    randomSalaryAt20() {
+        return shiftedGammaSample(this.salaryAt20Min, this.salaryAt20Mean, this.salaryAt20Dispersion);
+    }
+
+    randomLifetimeSalaryGrowthFactor() {
+        // console.log(`randomLifetimeSalaryGrowthFactor: ${this.lifetimeSalaryGrowthFactorMin}, ${this.lifetimeSalaryGrowthFactorMean}, ${this.lifetimeSalaryGrowthFactorDispersion}`);
+        return shiftedGammaSample(this.lifetimeSalaryGrowthFactorMin, this.lifetimeSalaryGrowthFactorMean, this.lifetimeSalaryGrowthFactorDispersion);
+    }
+
+    randomCostOfLivingBase() {
+        return shiftedGammaSample(0, this.costOfLivingBase, this.costOfLivingDispersion);
+    }
+
+    randomCostOfLivingSalaryFactor() {
+        return betaSample(0, 1, this.costOfLivingSalaryFactor, this.costOfLivingDispersion);
+    }
+
+    randomSurplusSavingRate() {
+        return betaSample(0, 1, this.surplusSavingRateMean, this.surplusSavingRateDispersion);
+    }
+
+    randomRentalInvestmentRate() {
+        return betaSample(0, 1, this.rentalInvestmentRateMean, this.rentalInvestmentRateDispersion);
+    }
+
+    randomCitizenLifePeriod() {
+        while (true) {
+            const lifeStartAge = Math.round(this.randomLifeStartAge(this.minStartLifeAge, this.maxStartLifeAge, this.meanStartLifeAge, this.dispersionStartLifeAge));
+            const lifespan = Math.round(this.randomLifespan(this.minLifespan, this.maxLifespan, this.meanLifespan, this.dispersionLifespan));
+
+            if (lifeStartAge < lifespan) {
+                return [lifeStartAge, lifespan];
             }
+        }
+    }
+
+    addCitizen() {
+        let [lifeStartAge, lifespan] = this.randomCitizenLifePeriod();
+        if (this.tick <= 1) {
+            lifeStartAge += Math.round(Math.random() * (lifespan - lifeStartAge));
+        }
+        const salaryAt20 = this.randomSalaryAt20();
+        const lifetimeSalaryGrowthFactor = this.randomLifetimeSalaryGrowthFactor();
+        const costOfLivingBase = this.randomCostOfLivingBase();
+        const costOfLivingSalaryFactor = this.randomCostOfLivingSalaryFactor();
+        const rentAffordabilityRatio = betaSample(0, 1, this.rentAffordabilityRatioMean, this.rentAffordabilityRatioDispersion);
+        const mortgageAffordabilityRatio = betaSample(0, 1, this.mortgageAffordabilityRatioMean, this.mortgageAffordabilityRatioDispersion);
+        const surplusSavingRate = shiftedGammaSample(0, this.surplusSavingRateMean, this.surplusSavingRateDispersion);
+        const rentalInvestmentRate = shiftedGammaSample(0, this.rentalInvestmentRateMean, this.rentalInvestmentRateDispersion);
+        const homeBuyingAge = shiftedGammaSample(18*52, this.homeBuyingAgeMean, this.homeBuyingAgeDispersion);
+        const citizen = new Citizen(this.tick, lifeStartAge, lifespan, this.retirementAge,
+                                    salaryAt20, lifetimeSalaryGrowthFactor,
+                                    costOfLivingBase, costOfLivingSalaryFactor,
+                                    rentAffordabilityRatio, mortgageAffordabilityRatio,
+                                    surplusSavingRate, rentalInvestmentRate,
+                                    homeBuyingAge);
+        this.citizens[citizen.id] = citizen;
+        this.setCitizenState(citizen, "looking");
+        this.updateCitizenMoneys(citizen);
+    }
+
+    buyHouse(citizen, house) {
+        if (house.state !== "forSale" && house.state !== "forSaleOrRent") {
+            console.warn("House is not for sale");
+            return;
+        }
+        const price = house.salePrice;
+        const [fullPrice, mortgage, mortgagePayment, mortgageDuration] = this.computeBuyOperation(price, citizen.savings, this.tick - citizen.lifeStart);
+
+        // console.log(`buyHouse: citizen: ${citizen.id}, house: ${house.id}, price: ${price}, fullPrice: ${fullPrice}, mortgage: ${mortgage}, mortgagePayment: ${mortgagePayment}, mortgageDuration: ${mortgageDuration}, savings: ${citizen.savings}, available for mortgage: ${citizen.salaryAvailableForMortgage}, workingEnd: ${citizen.workingEnd}, tick: ${this.tick}`);
+
+        if (mortgagePayment > 0) {
+            house.mortgagePayment = mortgagePayment;
+            house.mortgageEnd = this.tick + mortgageDuration;
+            citizen.savings = 0;
         }
         else {
-            console.warn("endRentingWithHouseId for not rented house $(house.id}")
+            house.mortgagePayment = 0;
+            house.mortgageEnd = 0;
+            citizen.savings -= fullPrice;
         }
+
+        if (house.owner !== null) {
+            this.disownHouse(house);
+        }
+
+        citizen.ownedHouses.push(house);
+        house.owner = citizen;
+        house.lastBuyPrice = price;
+        house.lastFullBuyPrice = fullPrice;
+        this.setHouseState(house, "forSaleOrRent");
+        this.housesBoughtInTick.push(house);
+
+        // console.log(`house bought: citizen: ${citizen.id}, house: ${house.id}, price: ${price}, mortgage: ${mortgage}, mortgagePayment: ${house.mortgagePayment}, lastBuyPrice: ${house.lastBuyPrice}, lastFullBuyPrice: ${house.lastFullBuyPrice}, savings: ${citizen.savings}, ownedHouses: ${citizen.ownedHouses.length}`);
     }
 
-    citizenUnrent(citizen) {
-        if (!citizen.house) {
-            throw new Error("Citizen is not renting a house");
+    ownerMovesIn(citizen) {
+        if (citizen.ownedHouses.length === 0) {
+            console.warn("Citizen has no house to move into");
+            return;
         }
-        citizen.changedTick = this.tick;
-        citizen.house = null;
+
+        let freeHouseIx = citizen.ownedHouses.findIndex(h => h.resident === null);
+        if (freeHouseIx == -1) {
+            this.endRentingContract(citizen.ownedHouses[0]);
+            freeHouseIx = 0;
+        }
+
+        const house = citizen.ownedHouses[freeHouseIx];
+        house.resident = citizen;
+        citizen.residence = house;
+        this.setHouseState(house, "occupiedByOwner");
+        this.setCitizenState(citizen, "ownsHisHome");
     }
 
-    houseUnrent(house) {
-        if (!house.renter) {
-            throw new Error("House is not rented");
+    ownerMovesOut(citizen) {
+        if (citizen.state !== "ownsHisHome") {
+            console.warn("Citizen does not live in his own house");
+            return;
         }
-        house.renter = null;
-        house.changedTick = this.tick;
-        house.rentalEnd = null;
-        house.rentingTime = null;
-        house.vacantTime = null;
+
+        const house = citizen.residence;
+        const owner = house.owner;
+        if (house.state !== "occupiedByOwner" || owner !== citizen) {
+            console.warn("Inconsidtent home/citizen states: house id:" + house.id + ", state: " + house.state + "; citizen id: " + citizen.id + ", state: " + citizen.state + "; owner id: " + owner.id);
+            return;
+        }
+
+        house.resident = null;
+        citizen.residence = null;
+        this.setHouseState(house, "forSaleOrRent");
+        this.setCitizenState(citizen, "looking");
     }
 
-    adjustPopulation(newNCitizens) {
-        const diff = newNCitizens - this.nCitizens;
-        if (diff > 0) {
-            for (let i = 0; i < diff; i++) {
-                const age = Math.random() * this.stdAge + this.meanAge;
-                const incomeFactor = this.incomeFactorLogNormal();
-                this.addCitizen(age, incomeFactor);
+    disownHouse(house) {
+        const owner = house.owner;
+        if (owner === null) {
+            console.warn("Can't disown house " + house.id + ", it does not have an owner");
+            return;
+        }
+
+        const len = owner.ownedHouses.length;
+        owner.ownedHouses = owner.ownedHouses.filter(ownedHouse => ownedHouse !== house);
+        if (len !== owner.ownedHouses.length + 1) {
+            console.warn("Mismatch in number of owned houses after disowning house, remaining owned houses: " + owner.ownedHouses.length + " expected: " + (len - 1));
+        }
+
+        if (house.state == "occupiedByOwner") {
+            this.ownerMovesOut(owner);
+            if (owner.ownedHouses.length > 0) {
+                this.ownerMovesIn(owner);
             }
         }
-        else if (diff < 0) {
-            const rmCitizens = Object.values(this.citizens)
-            shuffleAndTakeN(rmCitizens, -diff)
-            for (const citizen in rmCitizen) {
-                const house = citizen.house;
-                if (house) {
-                    this.endRenting(house);
+        else if (house.state == "rented") {
+            this.endRentingContract(house);
+        }
+
+        house.owner = null;
+        this.setHouseState(house, "forSale");
+    }
+
+    rmHouse(house) {
+        const state = house.state;
+        if (house.owner) {
+            this.disownHouse(house);
+        }
+        this.setHouseState(house, "removed");
+    }
+
+    rmCitizen(citizen) {
+        console.log("Removing citizen " + citizen.id + " (" + citizen + ")");
+        if (citizen.state === "renting") {
+            this.endRentingContract(citizen.residence);
+        }
+        else if (citizen.state === "ownsHisHome") {
+            this.ownerMovesOut(citizen);
+        }
+
+        for (const house of citizen.ownedHouses) {
+            this.disownHouse(house);
+        }
+
+        this.setCitizenState(citizen, "removed");
+    }
+
+    adjustPopulation() {
+        const diff = this.nCitizens - Object.keys(this.citizens).length;
+        if (diff !== 0) {
+            console.log(`adjustPopulation: diff: ${diff}, nCitizens: ${this.nCitizens}, current: ${Object.keys(this.citizens).length}`);
+            if (diff > 0) {
+                for (let i = 0; i < diff; i++) {
+                    this.addCitizen();
                 }
-                this.citizensLooking.delete(citizen.id);
-                delete this.citizens[citizen.id];
+            }
+            else {
+                const citizens = Object.values(this.citizens)
+                shuffleAndTakeN(citizens, -diff)
+                // console.log("Removing citizens: " + citizens.map(c => c.id));
+                for (const citizen of citizens) {
+                    // console.log("Removing citizen " + citizen.id);
+                    this.rmCitizen(citizen);
+                }
             }
         }
-        this.nCitizens = newNCitizens;
-    }
-
-    randomRentalPrice() {
-        const stddev = this.markup * 0.2;
-        const result = Math.max(1.0, this.currentRentalPrice * jStat.normal.sample(1.0 + this.markup, stddev));
-        // console.log(`new random rentalPrice: ${result}`);
-        return result;
     }
 
     addNHouses(newHouses) {
-        for (let i = 0; i < newHouses; i++) {
-
-            
-
-        const meanRentalPrice = mapAndMean(this.housesRented, (houseId) => this.houses[houseId].rentalPrice) || this.initialRentalPrice;
-        for (let i = 0; i < diff; i++) {
-            const rentalPrice = meanRentalPrice * Math.random() * (1 + this.markup * 0.5);
-            this.addHouse(rentalPrice);
-        }
+        for (let i = 0; i < newHouses; i++) { this.addHouse() }
     }
-    
-    adjustHousing(newNHouses) {
-        const diff = newNHouses - this.nHouses;;
-        if (diff > 0) {
-            addNHouses(diff);
-        } else if (diff < 0) {
-            const rmHouses = Object.values(this.houses);
-            shuffleAndTakeN(rmHouses, -diff);
-            for (const house of rmHouses) {
-                if (house.renter) {
-                    this.endRenting(house);
+
+    adjustHousing() {
+        const diff = this.nHouses - Object.keys(this.houses).length;
+        if (diff !== 0) {
+            console.log(`adjustHousing: diff: ${diff}, nHouses: ${this.nHouses}, current: ${Object.keys(this.houses).length}`);
+            if (diff > 0) {
+                // console.log("Adding " + diff + " houses");
+                this.addNHouses(diff);
+            }
+            else {
+                const rmHouses = Object.values(this.houses);
+                shuffleAndTakeN(rmHouses, -diff);
+                for (const house of rmHouses) {
+                    this.rmHouse(house);
                 }
-                this.housesForRent.delete(house.id);
-                delete this.houses[house.id];
             }
         }
-        this.nHouses = newNHouses;
     }
 
-    randomTtl() {
-        const sample = jStat.beta.sample(this.rentalDurationBetaAlpha, this.rentalDurationBetaBeta);
-        const result = Math.floor(sample * (this.rentalDurationMax-this.rentalDurationMin) + this.rentalDurationMin + 0.5);
-        // console.log(`beta sample: ${sample}, result: ${result}`)
-        return result;
+    randomRentalDuration() {
+        return shiftedGammaSample(0, this.rentalDurationMean, this.rentalDurationDispersion);
+    }
+
+    opEndRentals() {
+        let count = 0;
+        for (const houseId of this.housesRented) {
+            const house = this.houses[houseId];
+            if (house.rentalEnd <= this.tick) {
+                this.endRentingContract(house);
+                count += 1;
+            }
+        }
+        console.log(`opEndRentals: ended ${count} rental contracts at tick ${this.tick}`);
+    }
+
+    pickBestHouseN(housesAvailableIds, n, priceFunc, log=false) {
+        const n1 = Math.min(housesAvailableIds.length, n);
+        shuffleN(housesAvailableIds, n1);
+        let bestIx = null;
+        let bestPrice = Infinity;
+        const prices = []
+        for (let ix = 0; ix < n1; ix++) {
+            const altPrice = priceFunc(this.houses[housesAvailableIds[ix]]);
+            prices.push(altPrice);
+            if (altPrice < bestPrice) {
+                bestIx = ix;
+                bestPrice = altPrice;
+            }
+        }
+        const bestHouse = (bestIx !== null) ? this.houses[housesAvailableIds[bestIx]] : null;
+        if (log) {
+            const sortedPrices = prices.slice().sort((a, b) => a - b);
+            console.log(`best house: ${bestHouse ? bestHouse.id : "none"}, price: ${bestPrice}, n: ${n}, n1: ${n1}, prices: ${sortedPrices}`);
+        }
+        return [bestIx, bestHouse, bestPrice];
+    }
+
+    computeBuyOperation(housePrice, savings, age) {
+        // console.log(`computeBuyOperation: housePrice: ${housePrice}, savings: ${savings}, age: ${age}, buyingTaxes: ${this.buyingTaxes}, fixedBuyingCosts: ${this.fixedBuyingCosts}, mortgageRate: ${this.mortgageRate}, maxMortgageAge: ${this.maxMortgageAge}, maxMortgageDuration: ${this.maxMortgageDuration}`);
+        if (isFinite(housePrice) && isFinite(savings)) {
+            const fullPrice = housePrice * (1 + this.buyingTaxes) + this.fixedBuyingCosts;
+            const mortgage = Math.max(0, fullPrice - savings);
+            if (mortgage <= 0) {
+                return [fullPrice, 0, 0, 0];
+            }
+            const numberOfPayments = Math.min(this.maxMortgageAge - age, this.maxMortgageDuration);
+            if (numberOfPayments > 0) {
+                const mortgagePayment = computeWeeklyMortgagePayment(mortgage, this.mortgageRate, numberOfPayments);
+                // console.log(`computeBuyOperation: fullPrice: ${fullPrice}, mortgage: ${mortgage}, mortgagePayment: ${mortgagePayment}, numberOfPayments: ${numberOfPayments}`);
+                return [fullPrice, mortgage, mortgagePayment, numberOfPayments];
+            }
+        }
+        return [Infinity, Infinity, Infinity, Infinity];
+    }
+
+    opCitizensRent() {
+        const houseIds = Array.from(this.housesForRent);
+
+        const citizens = Object.values(this.citizens);
+        shuffle(citizens);
+        for (const citizen of citizens) {
+            if ((citizen.state === "looking") || (citizen.state === "renting")) {
+                const [houseIdsIx, house, price] = this.pickBestHouseN(houseIds, this.housesConsideredPerStep, (house) => house.rentPrice, false);
+                // console.log(`best house for renting: ${house ? house.id : "none"}, house state: ${house ? house.state : "none"} price: ${price}, citizen: ${citizen.id}, salary: ${citizen.salary}, salaryAvailableForRent: ${citizen.salaryAvailableForRent}, citizen state: ${citizen.state}, rent: ${citizen.salaryAvailableForRent >= price}`);
+                if (house && (citizen.salaryAvailableForRent >= price)) {
+                    if (citizen.residence) {
+                        if (citizen.residence.rentPrice * 0.95 < price) {
+                            continue
+                        }
+                        this.endRentingContract(citizen.residence);
+                    }
+                    this.makeRentingContract(citizen, house, this.randomRentalDuration());
+                    arrayRemoveAt(houseIds, houseIdsIx);
+                }
+            }
+        }
+    }
+
+    opCitizensBuy() {
+        const houseIds = Array.from(this.housesForSale);
+
+        // If can find house for sale at a good price it buys it. Otherwise it rents.
+        // TODO:
+        // - Degree of stability: the more stability, the higher the probability of buying
+        // - Savings. Money saved. / degree of savings ability.
+        // - Salary
+        // - Desperation. Time searching for a house.
+        // - Determination in searching for a house. Depends on the time spent searching and age.
+        // - Percentage of salary they are willing to spend on the house.
+
+        const citizens = Object.values(this.citizens);
+        shuffle(citizens);
+        for (const citizen of citizens) {
+            if (citizen.homeBuyingTick > this.tick) {
+                continue
+            }
+            const [houseIdsIx, house, price] = this.pickBestHouseN(houseIds, this.housesConsideredPerStep, (house) => house.salePrice);
+            if (house) {
+                let availableForMortgagePayment;
+                let availableSavings;
+                if (citizen.state === "ownsHisHome") {
+                    availableForMortgagePayment = this.citizenNetIncome(citizen) * citizen.rentalInvestmentRate;
+                    availableSavings = citizen.savings * citizen.rentalInvestmentRate;
+                }
+                else {
+                    availableForMortgagePayment = citizen.salaryAvailableForMortgage;
+                    availableSavings = citizen.savings;
+                }
+
+                const [fullPrice, mortgage, mortgagePayment] = this.computeBuyOperation(price, availableSavings, this.tick - citizen.lifeStart);
+
+                // console.log(`house price: ${price}, availableForMortgagePayment: ${availableForMortgagePayment}, availableSavings: ${availableSavings}, citizen: ${citizen.id}, state: ${citizen.state}, citizen.workingEnd: ${citizen.workingEnd}, tick: ${this.tick},fullPrice: ${fullPrice}, mortgage: ${mortgage}, mortgagePayment: ${mortgagePayment}`);
+
+                if ((fullPrice - availableSavings) / price > this.maxMortgageLoanToValue) {
+                    continue;
+                }
+
+                if (mortgagePayment <= availableForMortgagePayment) {
+                    if (citizen.state === "ownsHisHome") {
+                        const expectedRentPrice = this.currentRentPrice;
+                        if (expectedRentPrice !== null) {
+                            const excessYield = (expectedRentPrice * 52) / fullPrice - this.moneyDepositRate;
+                            if (excessYield < 0.01) {
+                                continue
+                            }
+                        }
+                    }
+                    else if (citizen.state === "renting") {
+                        if (mortgagePayment * this.mortgageWeight > citizen.residence.rentPrice) {
+                            continue; // We prefer renting!
+                        }
+                        this.endRentingContract(citizen.residence);
+                    }
+                    this.buyHouse(citizen, house);
+                    if (citizen.state !== "ownsHisHome") {
+                        this.ownerMovesIn(citizen);
+                    }
+
+                    arrayRemoveAt(houseIds, houseIdsIx);
+                }
+            }
+        }
+    }
+
+    amortizedMean(oldValue, oldWeight, amortizationFactor, values, cb) {
+        let sum = 0;
+        let count = 0;
+        let vs = [];
+        for (const value of values) {
+            const v = cb(value);
+            if (v !== null) {
+                sum += v;
+                count += 1;
+                vs.push(v);
+            }
+        }
+        if (count > 0) {
+            const amortizedOldWeight = oldWeight * amortizationFactor;
+            const newWeight = count + amortizedOldWeight;
+            const mean = (amortizedOldWeight * (oldValue||0) + sum) / newWeight;
+            // console.log(`amortizedMean: oldValue: ${oldValue}, oldWeight: ${oldWeight}, amortizationFactor: ${amortizationFactor}, sum: ${sum}, count: ${count}, newWeight: ${newWeight}, mean: ${mean}, vs: ${vs}`);
+            return [mean, newWeight];
+        }
+        return [oldValue, oldWeight];
+    }
+
+    updateCitizenMoneys(citizen) {
+        const salary = this.computeCitizenSalary(citizen);
+        const costOfLiving = Math.min(salary, citizen.costOfLivingBase + (salary - citizen.costOfLivingBase) * citizen.costOfLivingSalaryFactor);
+        const salaryAvailableForRent = (salary - costOfLiving) * citizen.rentalAffordabilityRatio;
+        const salaryAvailableForMortgage = (salary - costOfLiving) * citizen.mortgageAffordabilityRatio;
+
+        citizen.salary = salary;
+        citizen.costOfLiving = costOfLiving;
+        citizen.salaryAvailableForRent = salaryAvailableForRent;
+        citizen.salaryAvailableForMortgage = salaryAvailableForMortgage;
+    }
+
+    opUpdateCitizenMoneys() {
+        const citizens = Object.values(this.citizens);
+        for (const citizen of citizens) {
+            this.updateCitizenMoneys(citizen);
+        }
+    }
+
+    opRentMetrics() {
+        const oldRentPrice = this.currentRentPrice;
+        const oldRentPriceWeight = this.currentRentPriceWeight;
+        [this.currentRentPrice, this.currentRentPriceWeight] = this.amortizedMean(this.currentRentPrice, this.currentRentPriceWeight,
+                                                                                  this.currentRentPriceAmortizationFactor,
+                                                                                  this.housesRentedInTick, (house) => house.rentPrice);
+        console.log(`opRentMetrics: oldRentPrice: ${oldRentPrice}, currentRentPrice: ${this.currentRentPrice}, oldRentPriceWeight: ${oldRentPriceWeight}, currentRentPriceWeight: ${this.currentRentPriceWeight}, currentRentPriceAmortizationFactor: ${this.currentRentPriceAmortizationFactor}, housesRentedInTick: ${this.housesRentedInTick.length}/${this.housesRented.size}`);
+    }
+
+    opBuyMetrics() {
+        [this.currentSalePrice, this.currentSalePriceWeight] = this.amortizedMean(this.currentSalePrice, this.currentSalePriceWeight,
+                                                                                  this.currentSalePriceAmortizationFactor,
+                                                                                  this.housesBoughtInTick, (house) => house.lastBuyPrice);
+    }
+
+    updateRentPrice(house) {
+        const newPrice = house.rentPrice * (1.0 - this.rentPriceDrop);
+
+        // console.log(`House ${house.id}, current rent price: ${house.rentPrice}, next price: ${newPrice}, amortized maintenance cost: ${this.houseAmortizedMaintenanceCost}`);
+        if (newPrice > this.houseAmortizedMaintenanceCost) {
+            house.rentPrice = newPrice;
+        }
+    }
+
+    updateSalePrice(house) {
+        const oldPrice = house.salePrice;
+        house.salePrice = Math.max(1, house.salePrice * (1 - this.salePriceDrop));
+        // console.log(`updateSalePrice: House ${house.id}, old salePrice: ${oldPrice}, salePrice: ${house.salePrice}`);
+    }
+
+    opUpdatePrices() {
+        this.housesForRent.forEach((houseId) => { this.updateRentPrice(this.houses[houseId]) });
+        this.housesForSale.forEach((houseId) => { this.updateSalePrice(this.houses[houseId]) });
+    }
+
+    computeCitizenSalary(citizen) {
+        const salaryAt20 = citizen.salaryAt20;
+        const salaryGrowthFactor = citizen.lifetimeSalaryGrowthFactor;
+        const salaryAtTheEnd = salaryAt20 * salaryGrowthFactor;
+
+        if (citizen.workingEnd < this.tick) {
+            return salaryAtTheEnd * this.afterRetirementSalaryFactorMean;
+        }
+
+        const remaining = citizen.workingEnd - this.tick;
+        const span = this.retirementAge - 20 * 52;
+        const gone = span - remaining;
+
+        const salary = (salaryAtTheEnd * gone + salaryAt20 * remaining) / Math.max(1, span);
+
+        //console.log(`citizen: ${citizen.id}, salaryAt20: ${salaryAt20}, salaryGrowthFactor: ${salaryGrowthFactor}, salaryAtTheEnd: ${salaryAtTheEnd}, workingEnd: ${citizen.workingEnd}, tick: ${this.tick}, remaining: ${remaining}, span: ${span}, gone: ${gone}, salary: ${salary}`);
+
+        return salary;
+    }
+
+    citizenNetIncome(citizen) {
+        const currentSalary = citizen.salary;
+        const costOfLiving = citizen.costOfLiving;
+        let netIncome = currentSalary - costOfLiving;
+        if (citizen.state === "renting") {
+            netIncome -= citizen.residence.rentPrice;
+        }
+        else if (citizen.state === "looking") {
+            netIncome -= Math.min(this.currentRentPrice * this.nextCityRentPriceRatio, citizen.salaryAvailableForRent);
+        }
+        for (const house of citizen.ownedHouses) {
+            netIncome -= this.houseAmortizedMaintenanceCost;
+            if (house.mortgageEnd <= this.tick) {
+                netIncome -= house.mortgagePayment;
+            }
+            if (house.resident && house.resident !== citizen) {
+                netIncome += house.rentPrice;
+            }
+        }
+        return netIncome;
+    }
+
+    opCitizensDie() {
+        const citizens = Object.values(this.citizens);
+        //const endTicks = citizens.map(citizen => citizen.lifeEnd).sort((a, b) => a - b);
+        //console.log(`opCitizensDie: checking for dead citizens at tick ${this.tick}, next ticks: ${endTicks}`);
+
+        for (const citizen of citizens) {
+            const lifeEnd = citizen.lifeEnd;
+            if (citizen.lifeEnd < this.tick) {
+                // console.log(`Citizen ${citizen.id} has died at tick ${this.tick}`);
+                this.rmCitizen(citizen);
+            }
+        }
+    }
+
+    opSavings() {
+        const citizens = Object.values(this.citizens);
+        for (const citizen of citizens) {
+            const netIncome = this.citizenNetIncome(citizen);
+            if (netIncome > 0) {
+                const oldSavings = citizen.savings;
+                citizen.savings += netIncome * citizen.surplusSavingRate;
+                // console.log(`opSavings: citizen: ${citizen.id}, netIncome: ${netIncome}, surplusSavingRate: ${citizen.surplusSavingRate}, savings: ${oldSavings} -> ${citizen.savings}`);
+            }
+        }
+    }
+
+    opExternalMetrics() {
     }
 
     step() {
         this.tick += 1;
-        // console.log("Tick: " + this.tick + " Citizens: " + this.citizensLooking.size + " Houses: " + (this.housesForRent.size + this.housesRented.size));
-        const tick = this.tick;
-        const ha = this.housesForRent;
+
+        this.adjustHousing();
+        this.adjustPopulation();
+        this.opEndRentals();
+
+        this.opUpdateCitizenMoneys();
+
+        this.housesBoughtInTick = [];
+        this.opCitizensRent();
+        this.opRentMetrics();
 
         this.housesRentedInTick = [];
+        this.opCitizensBuy();
+        this.opBuyMetrics();
 
-        // console.log("[" + new Date().toISOString() + "] Ending renting contracts" + ha.size);
+        this.opCitizensDie();
 
-        for (const houseId of Array.from(this.housesRented)) {
-            const house = this.houses[houseId];
-            if (house.rentalEnd <= tick) {
-                // console.log(`Ending renting for house ${house.id}, ttl: ${house.rentalEnd - house.changedTick}`);
-                // const newRentalPrice = house.rentalPrice * (1 + this.markup * 0.5);
-                const newRentalPrice = this.randomRentalPrice();
-                this.endRenting(house, newRentalPrice);
-
-            }
-        }
-
-        // console.log("[" + new Date().toISOString() + "] Renting homes" + ha.size);
-
-        const rlIds = Array.from(this.citizensLooking);
-        const hvIds = Array.from(this.housesForRent);
-        shuffle(rlIds);
-        for (const citizenId of rlIds) {
-            if (hvIds.length === 0) break;
-            const citizen = this.citizens[citizenId];
-
-            shuffleN(hvIds, this.housesConsideredPerStep);
-            let bestIx = 0;
-            let bestRentalPrice = this.houses[hvIds[0]].rentalPrice;
-            for (let ix=1; ix < this.housesConsideredPerStep && ix < hvIds.length; ix++) {
-                const altRentalPrice = this.houses[hvIds[ix]].rentalPrice;
-                if (altRentalPrice < bestRentalPrice) {
-                    bestIx = ix;
-                    bestRentalPrice = altRentalPrice;
-                }
-            }
-
-            if (bestRentalPrice <= this.incomeAvailableForRent(citizen)) {
-                const bestHouse = this.houses[hvIds[bestIx]];
-                this.makeRentingContract(citizen, bestHouse, this.randomTtl());
-            }
-            else {
-                // console.log("not renting to " + citizenId + " because rent price is too high: " + bestRentalPrice +" > " + this.incomeAvailableForRent(citizen) + " citizen salary factor: " + citizen.incomeFactor + "(total: " + this.citizenIncome(citizen) + ")");
-            }
-
-            hvIds[bestIx] = hvIds.at(-1);
-            hvIds.pop();
-        }
-
-        const newWeight = this.housesRentedInTick.length;
-        // console.log(`newWeight: ${newWeight}`);
-
-        if (newWeight > 0) {
-            const oldPrice = this.currentRentalPrice
-            const newPrice = mapAndMean(this.housesRentedInTick, (house) => house.rentalPrice);
-            const oldWeight = this.currentRentalPriceWeight * this.currentRentalPriceAmortizationFactor;
-            const weight = oldWeight + newWeight;
-            this.currentRentalPrice = (oldWeight * oldPrice + newWeight * newPrice) / weight;
-            this.currentRentalPriceWeight = weight;
-            // console.log(`newWeight: ${newWeight}, newPrice: ${newPrice}, oldWeight: ${oldWeight}, oldPrice: ${oldPrice} --> ${this.currentRentalPrice}`)
-        }
-
-        // console.log("[" + new Date().toISOString() + "] Dropping prices" + ha.size);
-        for (const houseId of ha) {
-            const house = this.houses[houseId];
-            house.setRentalPrice(Math.max(1.0, house.rentalPrice * (1 - this.priceDrop)));
-        }
+        this.opUpdatePrices();
+        this.opSavings();
+        this.opExternalMetrics();
     }
 
-    citizenIncome(citizen) {
-        return citizen.incomeFactor * this.meanIncome;
-    }
 
-    incomeAvailableForRent(citizen) {
-        const income = this.citizenIncome(citizen);
-        return Math.min(income - this.costOfLiving, income * this.rentAffordability);
-    }
 }
 
 class History {
@@ -421,27 +1190,39 @@ class History {
         this.times = [];
         this.housesAll = [];
         this.housesForRent = [];
+        this.housesForSale = [];
         this.housesRented = [];
+        this.housesOccupiedByOwner = [];
+
         this.citizensAll = [];
-        this.citizensRenting = [];
         this.citizensLooking = [];
-        this.incomeAll = [];
-        this.incomeRenting = [];
-        this.incomeLooking = [];
-        this.incomeAvailableForRentAll = [];
-        this.incomeAvailableForRentRenting = [];
-        this.incomeAvailableForRentLooking = [];
-        this.rentalPriceAll = [];
-        this.rentalPriceHousesForRent = [];
-        this.rentalPriceHousesForRent = [];
+        this.citizensRenting = [];
+        this.citizensOwningTheirHomes = [];
+
+        this.meanSalaryAll = [];
+        this.meanSalaryRenting = [];
+        this.meanSalaryLooking = [];
+        this.meanSalaryOwningTheirHomes = [];
+        this.meanSalaryAvailableForHome = []
+
+        this.meanRentPriceHousesAll = [];
+        this.meanRentPriceHousesForRent = [];
+        this.meanRentPriceHousesRented = [];
+        this.meanRentPriceHousesRentedInTick = [];
+        this.currentRentPrice = [];
+        this.meanSalePriceMortgagePayment = [];
+
+        this.meanSalePrice = [];
+        this.meanSalePriceInTick = [];
+        this.currentSalePrice = [];
+
         this.houseVacantTime = [];
 
-        this.inTickRent = [];
+        this.inTickRentPrice = [];
+        this.inTickSalePrice = [];
         this.inTickAvailableForRent = [];
         this.inTickLookingTime = [];
         this.inTickVacantTime = [];
-
-        this.currentRentalPrice = [];
     }
 
     init(model) {
@@ -455,34 +1236,73 @@ class History {
         this.ticks.push(model.tick);
         this.times.push(weeksToYears(model.tick));
 
-        this.housesAll.push(model.nHouses);
+        this.housesAll.push(model.houses.length);
         this.housesForRent.push(model.housesForRent.size);
+        this.housesForSale.push(model.housesForSale.size);
         this.housesRented.push(model.housesRented.size);
+        this.housesOccupiedByOwner.push(model.housesOccupiedByOwner.size);
 
-        this.citizensAll.push(model.nCitizens);
-        this.citizensRenting.push(model.citizensRenting.size);
+        this.citizensAll.push(model.citizens.length);
         this.citizensLooking.push(model.citizensLooking.size);
+        this.citizensRenting.push(model.citizensRenting.size);
+        this.citizensOwningTheirHomes.push(model.citizensOwningTheirHomes.size);
 
-        this.incomeAll.push(mapAndMean(Object.values(citizens), (citizen) => model.citizenIncome(citizen)));
-        this.incomeRenting.push(mapAndMean(model.citizensRenting, (citizenId) => model.citizenIncome(citizens[citizenId])));
-        this.incomeLooking.push(mapAndMean(model.citizensLooking, (citizenId) => model.citizenIncome(citizens[citizenId])));
+        const meanRentPriceHousesForRent = mapAndMean(model.housesForRent, (houseId) => houses[houseId].rentPrice);
+        this.meanRentPriceHousesForRent.push(weeklyToMonthlyRent(meanRentPriceHousesForRent));
 
-        this.incomeAvailableForRentAll.push(mapAndMean(Object.values(citizens), (citizen) => model.incomeAvailableForRent(citizen)));
-        this.incomeAvailableForRentRenting.push(mapAndMean(model.citizensRenting, (citizenId) => model.incomeAvailableForRent(citizens[citizenId])));
-        this.incomeAvailableForRentLooking.push(mapAndMean(model.citizensLooking, (citizenId) => model.incomeAvailableForRent(citizens[citizenId])));
+        const meanRentPriceHousesRented = mapAndMean(model.housesRented, (houseId) => houses[houseId].rentPrice);
+        this.meanRentPriceHousesRented.push(weeklyToMonthlyRent(meanRentPriceHousesRented));
 
-        this.rentalPriceAll.push(mapAndMean(Object.values(houses), (house) => house.rentalPrice));
-        this.rentHousesForRent.push(mapAndMean(model.housesRented, (houseId) => houses[houseId].rentalPrice));
-        this.rentHousesForRent.push(mapAndMean(model.housesForRent, (houseId) => houses[houseId].rentalPrice));
+        const meanRentPriceHousesAll =
+              ( meanRentPriceHousesForRent * model.housesForRent.length +
+                meanRentPriceHousesRented * model.housesRented.length ) /
+              ( model.housesForRent.length + model.housesRented.length );
+        this.meanRentPriceHousesAll.push(weeklyToMonthlyRent(meanRentPriceHousesAll));
 
-        this.houseVacantTime.push(mapAndMean(model.housesForRent, (houseId) => model.tick - houses[houseId].createdTick));
+        this.meanRentPriceHousesRentedInTick.push(mapAndMean(model.housesRentedInTick, (house) => house.rentPrice));
+        this.currentRentPrice.push(weeklyToMonthlyRent(model.currentRentPrice));
 
-        this.inTickRent.push(mapAndMean(model.housesRentedInTick, (house) => house.rentalPrice));
-        this.inTickAvailableForRent.push(mapAndMean(model.housesRentedInTick, (house) => model.incomeAvailableForRent(house.renter)));
+        const meanSalePrice = mapAndMean(model.housesForSale, (houseId) => houses[houseId].salePrice);
+        this.meanSalePrice.push(meanSalePrice);
+        this.meanSalePriceInTick.push(mapAndMean(model.housesBoughtInTick, (house) => house.salePrice));
+        this.currentSalePrice.push(model.currentSalePrice);
+
+        const mortgagePayment = computeWeeklyMortgagePayment(model.currentSalePrice, model.mortgageRate, model.maxMortgageDuration);
+        this.meanSalePriceMortgagePayment.push(weeklyToMonthlyRent(mortgagePayment));
+        console.log(`equivalent mortgagePayment: ${mortgagePayment}, currentSalePrice: ${model.currentSalePrice}, mortgageRate: ${model.mortgageRate}, maxMortgageDuration: ${model.maxMortgageDuration}`);
+
+        const meanSalaryRentingMean = mapAndMean(model.citizensRenting, (citizenId) => citizens[citizenId].salary);
+        const meanSalaryLookingMean = mapAndMean(model.citizensLooking, (citizenId) => citizens[citizenId].salary);
+        const meanSalaryOwningTheirHomesMean = mapAndMean(model.citizensOwningTheirHomes, (citizenId) => citizens[citizenId].salary);
+
+        const rentingN = model.citizensRenting.size;
+        const lookingN = model.citizensLooking.size;
+        const owningN = model.citizensOwningTheirHomes.size;
+
+        const meanSalaryAllMean = ((meanSalaryRentingMean || 0) * rentingN +
+                                   (meanSalaryLookingMean || 0) * lookingN +
+                                   (meanSalaryOwningTheirHomesMean || 0) * owningN) /
+              (rentingN + lookingN + owningN);
+
+        this.meanSalaryAll.push(weeklyToMonthlyRent(meanSalaryAllMean));
+        this.meanSalaryRenting.push(weeklyToMonthlyRent(meanSalaryRentingMean));
+        this.meanSalaryLooking.push(weeklyToMonthlyRent(meanSalaryLookingMean));
+        this.meanSalaryOwningTheirHomes.push(weeklyToMonthlyRent(meanSalaryOwningTheirHomesMean));
+        return;
+
+        this.salaryAvailableForRentRenting.push(mapAndMean(model.citizensRenting, (citizenId) => model.salaryAvailableForRent(citizens[citizenId])));
+        this.salaryAvailableForRentLooking.push(mapAndMean(model.citizensLooking, (citizenId) => model.salaryAvailableForRent(citizens[citizenId])));
+
+
+
+        this.houseVacantTime.push(mapAndMean(model.housesForRent, (houseId) => model.tick - houses[houseId].creationTick));
+
+        this.inTickRent.push(mapAndMean(model.housesRentedInTick, (house) => house.rentPrice));
+        this.inTickAvailableForRent.push(mapAndMean(model.housesRentedInTick, (house) => ((house.state === "rented") ? model.salaryAvailableForRent(house.resident) : null)));
         this.inTickVacantTime.push(mapAndMean(model.housesRentedInTick, (house) => house.vacantTime));
-        this.inTickLookingTime.push(mapAndMean(model.housesRentedInTick, (house) => house.renter.lookingTime));
+        this.inTickLookingTime.push(mapAndMean(model.housesRentedInTick, (house) => house.resident.lookingTime));
 
-        this.currentRentalPrice.push(model.currentRentalPrice);
+
 
     }
 }
