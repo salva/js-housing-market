@@ -249,234 +249,43 @@ class HousingMarket {
         this.currentSalePriceWeight = 0;
         this.currentSalePriceAmortizationFactor = 0.9;
 
-        this.houseAmortizedMaintenanceCost = 0; //100;
+        this.houseMaintenanceCost = 100;
+        this.houseConstructionCostMean = 200000;
+        this.houseConstructionCostDispersion = 0.2;
 
-        this.minStartLifeAge = 20 * 52;
-        this.maxStartLifeAge = 105 * 52;
-        this.meanStartLifeAge = 28 * 52;
-        this.dispersionStartLifeAge = 0.05;
+        this.minHouseSalePrice = 50000;
+        this.refurbishmentCostMean = 5000;
+        this.refurbishmentCostDispersion = 0.2;
+        this.lifeStartAgeMin = 20 * 52;
+        this.lifeStartAgeMax = 105 * 52;
+        this.lifeStartAgeMean = 28 * 52;
+        this.lifeStartAgeDispersion = 0.05;
         this.retirementAge = 68 * 52;
 
-        this.minLifespan = 20 * 52;
-        this.maxLifespan = 105 * 52;
-        this.meanLifespan = 80 * 52;
-        this.dispersionLifespan = 0.05;
+        this.lifespanMin = 20 * 52;
+        this.lifespanMax = 105 * 52;
+        this.lifespanMean = 80 * 52;
+        this.lifespanDispersion = 0.05;
 
         this.housesRentedInTick = [];
         this.housesBoughtInTick = [];
     }
 
-    setNCitizens(val) {
-        console.log(`Number of Citizens changed from ${this.nCitizens} to ${val}`);
-        this.nCitizens = val;
-    }
-
-    setNHouses(val) {
-        console.log(`Number of Houses changed from ${this.nHouses} to ${val}`);
-        this.nHouses = val;
-    }
-
-    setSavingsRatio(val) {
-        console.log(`Savings Ratio changed from ${this.savingsRatio} to ${val}`);
-        this.savingsRatio = val;
-    }
-
-    setCostOfLivingBase(val) {
-        console.log(`Cost of Living changed from ${this.costOfLiving} to ${val}`);
-        this.costOfLivingBase = val;
-    }
-    setCostOfLivingSalaryFactor(val) {
-        console.log(`Cost of Living Salary Factor changed from ${this.costOfLivingSalaryFactor} to ${val}`);
-        this.costOfLivingSalaryFactor = val;
-    }
-    setCostOfLivingDispersion(val) {
-        console.log(`Cost of Living Dispersion changed from ${this.costOfLivingDispersion} to ${val}`);
-        this.costOfLivingDispersion = val;
-    }
-
-    setSaleMarkup(val) {
-        console.log(`SaleMarkup changed from ${this.saleMarkup} to ${val}`);
-        this.saleMarkup = val;
-    }
-
-    setRentMarkup(val) {
-        console.log(`RentMarkup changed from ${this.rentMarkup} to ${val}`);
-        this.rentMarkup = val;
-    }
-
-    setSalePriceDrop(val) {
-        console.log(`Sale Price Drop changed from ${this.salePriceDrop} to ${val}`);
-        this.salePriceDrop = val;
-    }
-
-    setRentPriceDrop(val) {
-        console.log(`Rent Price Drop changed from ${this.rentPriceDrop} to ${val}`);
-        this.rentPriceDrop = val;
-    }
-
-    setHousesPerStep(val) {
-        console.log(`Houses Considered per Step changed from ${this.housesPerStep} to ${val}`);
-        this.housesPerStep = val;
-    }
-
-    setRentalDurationMean(val) {
-        console.log(`Rental Duration Mean changed from ${this.rentalDurationMean} to ${val}`);
-        this.rentalDurationMean = val;
-    }
-    setRentalDurationDispersion(val) {
-        console.log(`Rental Duration Dispersion changed from ${this.rentalDurationDispersion} to ${val}`);
-        this.rentalDurationDispersion = val;
-    }
-
-    setLifespanMean(val) {
-        console.log(`Lifespan Mean changed from ${this.meanLifespan} to ${val}`);
-        this.meanLifespan = val;
-    }
-    setLifespanDispersion(val) {
-        console.log(`Lifespan Dispersion changed from ${this.dispersionLifespan} to ${val}`);
-        this.dispersionLifespan = val;
-    }
-
-    setLifespanMin(val) {
-        console.log(`Lifespan Min changed from ${this.minLifespan} to ${val}`);
-        this.minLifespan = val;
-    }
-    setLifespanMax(val) {
-        console.log(`Lifespan Max changed from ${this.maxLifespan} to ${val}`);
-        this.maxLifespan = val;
-    }
-
-    setLifeStartAgeMean(val) {
-        console.log(`Life Start Age Mean changed from ${this.meanStartLifeAge} to ${val}`);
-        this.meanStartLifeAge = val;
-    }
-    setLifeStartAgeDispersion(val) {
-        console.log(`Life Start Age Dispersion changed from ${this.dispersionStartLifeAge} to ${val}`);
-        this.dispersionStartLifeAge = val;
-    }
-    setLifeStartAgeMin(val) {
-        console.log(`Life Start Age Min changed from ${this.minStartLifeAge} to ${val}`);
-        this.minStartLifeAge = val;
-    }
-    setLifeStartAgeMax(val) {
-        console.log(`Life Start Age Max changed from ${this.maxStartLifeAge} to ${val}`);
-        this.maxStartLifeAge = val;
-    }
-
-    setRetirementAge(val) {
-        console.log(`Retirement Age changed from ${this.retirementAge} to ${val}`);
-        this.retirementAge = val;
-    }
-
-    setSalaryAt20Min(val) {
-        console.log(`Salary At 20 Min changed from ${this.salaryAt20Min} to ${val}`);
-        this.salaryAt20Min = val;
-    }
-    setSalaryAt20Mean(val) {
-        console.log(`Salary At 20 Mean changed from ${this.salaryAt20Mean} to ${val}`);
-        this.salaryAt20Mean = val;
-    }
-    setSalaryAt20Dispersion(val) {
-        console.log(`Salary At 20 Dispersion changed from ${this.salaryAt20Dispersion} to ${val}`);
-        this.salaryAt20Dispersion = val;
-    }
-
-    setLifetimeSalaryGrowthFactorMin(val) {
-        console.log(`Lifetime Salary Growth Factor Min changed from ${this.lifetimeSalaryGrowthFactorMin} to ${val}`);
-        this.lifetimeSalaryGrowthFactorMin = val;
-    }
-
-    setLifetimeSalaryGrowthFactorMean(val) {
-        console.log(`Lifetime Salary Growth Factor Mean changed from ${this.lifetimeSalaryGrowthFactorMean} to ${val}`);
-        this.lifetimeSalaryGrowthFactorMean = val;
-    }
-    setLifetimeSalaryGrowthFactorDispersion(val) {
-        console.log(`Lifetime Salary Growth Factor Dispersion changed from ${this.lifetimeSalaryGrowthFactorDispersion} to ${val}`);
-        this.lifetimeSalaryGrowthFactorDispersion = val;
-    }
-
-    setRentAffordabilityRatioMean(val) {
-        console.log(`Rent Affordability Ratio Mean changed from ${this.rentAffordabilityRatioMean} to ${val}`);
-        this.rentAffordabilityRatioMean = val;
-    }
-
-    setRentAffordabilityRatioDispersion(val) {
-        console.log(`Rent Affordability Ratio Dispersion changed from ${this.rentAffordabilityRatioDispersion} to ${val}`);
-        this.rentAffordabilityRatioDispersion = val;
-    }
-
-    setMortgageAffordabilityRatioMean(val) {
-        console.log(`Mortgage Affordability Ratio Mean changed from ${this.mortgageAffordabilityRatioMean} to ${val}`);
-        this.mortgageAffordabilityRatioMean = val;
-    }
-
-    setMortgageAffordabilityRatioDispersion(val) {
-        console.log(`Mortgage Affordability Ratio Dispersion changed from ${this.mortgageAffordabilityRatioDispersion} to ${val}`);
-        this.mortgageAffordabilityRatioDispersion = val;
-    }
-
-    setSurplusSavingRateMean(val) {
-        console.log(`Surplus Saving Rate Mean changed from ${this.surplusSavingRateMean} to ${val}`);
-        this.surplusSavingRateMean = val;
-    }
-
-    setSurplusSavingRateDispersion(val) {
-        console.log(`Surplus Saving Rate Dispersion changed from ${this.surplusSavingRateDispersion} to ${val}`);
-        this.surplusSavingRateDispersion = val;
-    }
-
-    setRentalInvestmentRateMean(val) {
-        console.log(`Rental Investment Rate Mean changed from ${this.rentalInvestmentRateMean} to ${val}`);
-        this.rentalInvestmentRateMean = val;
-    }
-
-    setRentalInvestmentRateDispersion(val) {
-        console.log(`Rental Investment Rate Dispersion changed from ${this.rentalInvestmentRateDispersion} to ${val}`);
-        this.rentalInvestmentRateDispersion = val;
-    }
-
-    setMortgageRate(val) {
-        console.log(`Mortgage Rate changed from ${this.mortgageRate} to ${val}`);
-        this.mortgageRate = val;
-    }
-    setMaxMortgageDuration(val) {
-        console.log(`Max Mortgage Duration changed from ${this.maxMortgageDuration} to ${val}`);
-        this.maxMortgageDuration = val;
-    }
-
-    setMaxMortgageAge(val) {
-        console.log(`Max Mortgage Age changed from ${this.maxMortgageAge} to ${val}`);
-        this.maxMortgageAge = val;
-    }
-
-    setMaxMortgageLoanToValue(val) {
-        console.log(`Max Mortgage Loan To Value changed from ${this.maxMortgageLoanToValue} to ${val}`);
-        this.maxMortgageLoanToValue = val;
-    }
-
-    setHomeBuyingAgeMin(val) {
-        console.log(`Home Buying Age Min changed from ${this.homeBuyingAgeMin} to ${val}`);
-        this.homeBuyingAgeMin = val;
-    }
-
-    setHomeBuyingAgeMean(val) {
-        console.log(`Home Buying Age Mean changed from ${this.homeBuyingAgeMean} to ${val}`);
-        this.homeBuyingAgeMean = val;
-    }
-
-    setHomeBuyingAgeDispersion(val) {
-        console.log(`Home Buying Age Dispersion changed from ${this.homeBuyingAgeDispersion} to ${val}`);
-        this.homeBuyingAgeDispersion = val;
-    }
-
-    setMinAcceptableExcessYieldMean(val) {
-        console.log(`Min Acceptable Excess Yield Mean changed from ${this.minAcceptableExcessYieldMean} to ${val}`);
-        this.minAcceptableExcessYieldMean = val;
-    }
-
-    setMinAcceptableExcessYieldDispersion(val) {
-        console.log(`Min Acceptable Excess Yield Dispersion changed from ${this.minAcceptableExcessYieldDispersion} to ${val}`);
-        this.minAcceptableExcessYieldDispersion = val;
+    setParameter(key, value) {
+        const methodName = 'set' + key.charAt(0).toUpperCase() + key.slice(1);
+        if (this.hasOwnProperty(methodName)) {
+            if (typeof this[methodName] !== 'function') {
+                throw new Error(`Method ${methodName} is not a function on model.`);
+            }
+            this[methodName](value);
+        }
+        else if (this.hasOwnProperty(key)) {
+            console.log(`Setting model property ${key} to ${value} (old value: ${this[key]})`);
+            this[key] = value;
+        }
+        else {
+            throw new Error(`Model does not have method or property ${methodName} or ${key}`);
+        }
     }
 
     setHouseRentPrice(house) {
@@ -501,7 +310,7 @@ class HousingMarket {
         else {
             house.salePrice = this.currentSalePrice * (1 + this.saleMarkup);
         }
-        // console.log(`setHouseSalePrice: house ${house.id}, rentPrice: ${house.rentPrice}, salePrice: ${house.salePrice}, amortized maintenance cost: ${this.houseAmortizedMaintenanceCost}, rentPrice: ${rentPrice}, money deposit rate: ${this.moneyDepositRate}, saleMarkup: ${this.saleMarkup}, currentSalePrice: ${this.currentSalePrice}`);
+        // console.log(`setHouseSalePrice: house ${house.id}, rentPrice: ${house.rentPrice}, salePrice: ${house.salePrice}, amortized maintenance cost: ${this.houseMaintenanceCost}, rentPrice: ${rentPrice}, money deposit rate: ${this.moneyDepositRate}, saleMarkup: ${this.saleMarkup}, currentSalePrice: ${this.currentSalePrice}`);
     }
 
     setHouseState(house, state) {
@@ -630,11 +439,11 @@ class HousingMarket {
     }
 
     randomLifeStartAge() {
-        return betaSample(this.minStartLifeAge, this.maxStartLifeAge, this.meanStartLifeAge, this.dispersionStartLifeAge);
+        return betaSample(this.lifeStartAgeMin, this.lifeStartAgeMax, this.lifeStartAgeMean, this.lifeStartAgeDispersion);
     }
 
     randomLifespan() {
-        return betaSample(this.minLifespan, this.maxLifespan, this.meanLifespan, this.dispersionLifespan);
+        return betaSample(this.lifespanMin, this.lifespanMax, this.lifespanMean, this.lifespanDispersion);
     }
 
     randomSalaryAt20() {
@@ -664,8 +473,8 @@ class HousingMarket {
 
     randomCitizenLifePeriod() {
         while (true) {
-            const lifeStartAge = Math.round(this.randomLifeStartAge(this.minStartLifeAge, this.maxStartLifeAge, this.meanStartLifeAge, this.dispersionStartLifeAge));
-            const lifespan = Math.round(this.randomLifespan(this.minLifespan, this.maxLifespan, this.meanLifespan, this.dispersionLifespan));
+            const lifeStartAge = Math.round(this.randomLifeStartAge(this.lifeStartAgeMin, this.lifeStartAgeMax, this.lifeStartAgeMean, this.lifeStartAgeDispersion));
+            const lifespan = Math.round(this.randomLifespan(this.lifespanMin, this.lifespanMax, this.lifespanMean, this.lifespanDispersion));
 
             if (lifeStartAge < lifespan) {
                 return [lifeStartAge, lifespan];
@@ -1069,8 +878,8 @@ class HousingMarket {
     updateRentPrice(house) {
         const newPrice = house.rentPrice * (1.0 - this.rentPriceDrop);
 
-        // console.log(`House ${house.id}, current rent price: ${house.rentPrice}, next price: ${newPrice}, amortized maintenance cost: ${this.houseAmortizedMaintenanceCost}`);
-        if (newPrice > this.houseAmortizedMaintenanceCost) {
+        // console.log(`House ${house.id}, current rent price: ${house.rentPrice}, next price: ${newPrice}, amortized maintenance cost: ${this.houseMaintenanceCost}`);
+        if (newPrice > this.houseMaintenanceCost) {
             house.rentPrice = newPrice;
         }
     }
@@ -1117,7 +926,7 @@ class HousingMarket {
             netIncome -= Math.min(this.currentRentPrice * this.nextCityRentPriceRatio, citizen.salaryAvailableForRent);
         }
         for (const house of citizen.ownedHouses) {
-            netIncome -= this.houseAmortizedMaintenanceCost;
+            netIncome -= this.houseMaintenanceCost;
             if (house.mortgageEnd <= this.tick) {
                 netIncome -= house.mortgagePayment;
             }

@@ -75,13 +75,13 @@ class Control {
 
     initModel() {
         this.model = new HousingMarket();
-        this.model.setLifespanMin(config.lifespanMean.min);
-        this.model.setLifespanMax(config.lifespanMean.max);
-        this.model.setLifeStartAgeMin(config.lifeStartAgeMean.min);
-        this.model.setLifeStartAgeMax(config.lifeStartAgeMean.max);
-        this.model.setSalaryAt20Min(config.salaryAt20Mean.min);
-        this.model.setLifetimeSalaryGrowthFactorMin(config.lifetimeSalaryGrowthFactorMean.min);
-        this.model.setHomeBuyingAgeMin(config.homeBuyingAgeMean.min);
+        this.model.setParameter('lifespanMin', config.lifespanMean.min);
+        this.model.setParameter('lifespanMax', config.lifespanMean.max);
+        this.model.setParameter('lifeStartAgeMin', config.lifeStartAgeMean.min);
+        this.model.setParameter('lifeStartAgeMax', config.lifeStartAgeMean.max);
+        this.model.setParameter('salaryAt20Min', config.salaryAt20Mean.min);
+        this.model.setParameter('lifetimeSalaryGrowthFactorMin', config.lifetimeSalaryGrowthFactorMean.min);
+        this.model.setParameter('homeBuyingAgeMin', config.homeBuyingAgeMean.min);
     }
 
     initHistory() {
@@ -154,7 +154,7 @@ class Control {
         sliderElements.forEach(slider => {
             const key = slider.id;
             const normalizer = slider.dataset.normalizer;
-            const methodName = 'set' + key.charAt(0).toUpperCase() + key.slice(1);
+
 
             let value = parseFloat(slider.value);
             if (normalizer === 'percent') {
@@ -167,7 +167,7 @@ class Control {
                 value = monthlyToWeeklyRent(value);
             }
             console.log("Setting " + key + " to " + value);
-            this.model[methodName](value);
+            this.model.setParameter(key, value);
         });
     }
 

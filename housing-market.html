@@ -99,6 +99,10 @@
           <input type="range" id="nHouses"><br>
           <div class="slider-description">Total number of houses available for rent in the market.</div>
 
+          <label for="minHouseSalePrice">Minimum Sale Price ($): <span id="minHouseSalePriceValue">100000</span></label><br>
+          <input type="range" id="minHouseSalePrice"<br>
+          <div class="slider-description">Minimum price for a house to be considered for sale.</div>
+
           <label for="houseConstructionCostMean">Mean House Construction Cost ($): <span id="houseConstructionCostMeanValue">100000</span></label><br>
           <input type="range" id="houseConstructionCostMean"<br>
           <div class="slider-description">Average cost of constructing a house.</div>
@@ -107,17 +111,17 @@
           <input type="range" id="houseConstructionCostDispersion" data-normalizer="percent"><br>
           <div class="slider-description">Dispersion of house construction cost.</div>
 
-          <label for="minHouseSalePrice">Minimum Sale Price ($): <span id="minHouseSalePriceValue">100000</span></label><br>
-          <input type="range" id="minSalePrice"<br>
-          <div class="slider-description">Minimum price for a house to be considered for sale.</div>
+          <label for="refurbishmentCostMean">Mean Refurbishment Cost ($): <span id="refurbishmentCostMeanValue">10000</span></label><br>
+          <input type="range" id="refurbishmentCostMean" data-normalizer="yearlyRent"><br>
+          <div class="slider-description">Average cost of refurbishment a house.</div>
 
-          <label for="refurbishingCostMean">Mean Refurbishing Cost ($): <span id="refurbishingCostValue">10000</span></label><br>
-          <input type="range" id="refurbishingCostMean" data-normalizer="yearlyRent"><br>
-          <div class="slider-description">Average cost of refurbishing a house.</div>
+          <label for="refurbishmentCostDispersion">Refurbishment Cost Dispersion (%): <span id="refurbishmentCostDispersionValue">5</span></label><br>
+          <input type="range" id="refurbishmentCostDispersion" data-normalizer="percent"><br>
+          <div class="slider-description">Dispersion of refurbishment cost.</div>
 
-          <label for="refurbishingCostDispersion">Refurbishing Cost Dispersion (%): <span id="refurbishingCostDispersionValue">5</span></label><br>
-          <input type="range" id="refurbishingCostDispersion" data-normalizer="percent"><br>
-          <div class="slider-description">Dispersion of refurbishing cost.</div>
+          <label for="houseMaintenanceCost">Yearly Maintenance Cost ($): <span id="houseMaintenanceCostValue">100</span></label><br>
+          <input type="range" id="houseMaintenanceCost" data-normalizer="yearlyRent"><br>
+          <div class="slider-description">Yearly maintenance cost of a house (taxes, insurance, community fees, maintenace works, etc.).</div>
         </div>
       </div>
 
@@ -184,8 +188,8 @@
           <input type="range" id="costOfLivingDispersion" data-normalizer="percent" update-distributions="true"><br>
           <div class="slider-description">Dispersion of cost of living.</div>
 
-          <label for="housesPerStep">Houses Considered per Step: <span id="housesPerStepValue">10</span></label><br>
-          <input type="range" id="housesPerStep"><br>
+          <label for="housesConsideredPerStep">Houses Considered per Step: <span id="housesConsideredPerStepValue">10</span></label><br>
+          <input type="range" id="housesConsideredPerStep"><br>
           <div class="slider-description">Number of houses each citizen evaluates per step.</div>
 
         </div>

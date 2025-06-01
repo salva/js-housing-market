@@ -54,6 +54,12 @@ const config = {
         max: 1.0,
         default: 0.15
     },
+
+    minSalePrice: {
+        min: 0,
+        max: 1000000,
+        default: 40000,
+    },
     salePriceDrop: {
         min: 0.0,
         max: 1.0,
@@ -64,7 +70,7 @@ const config = {
         max: 1.0,
         default: 0.05
     },
-    housesPerStep: {
+    housesConsideredPerStep: {
         min: 1,
         max: 50,
         default: 10
@@ -223,5 +229,20 @@ const config = {
         min: 0.0,
         max: 0.5,
         default: 0.1
-    }
+    },
+    refurbishmentCostMean: {
+        min: 0,
+        max: 1000000,
+        default: 60000,
+    },
+    refurbishmentCostDispersion: {
+        min: 0.0,
+        max: 0.5,
+        default: 0.1
+    },
+    houseMaintenanceCost: {
+        min: 0,
+        max: 1000000,
+        default: 6000,
+    },
 };
