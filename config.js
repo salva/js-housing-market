@@ -242,7 +242,7 @@ const config = {
     },
     houseMaintenanceCost: {
         min: 0,
-        max: 1000000,
-        default: 6000,
+        max: 200000 / 52,
+        default: 6000 / 52,
     },
 };

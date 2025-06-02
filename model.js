@@ -293,7 +293,6 @@ class HousingMarket {
         const refRentPrice = (this.currentRentPrice ?? (house.lastBuyPrice * (this.moneyDepositRate / 52) * (1 + this.rentOverload)));
         const stddev = this.rentMarkup * 0.2;
         house.rentPrice = Math.max(1.0, refRentPrice * jStat.normal.sample(1.0 + this.rentMarkup, stddev));
-        // console.log(`setHouseRentPrice: house ${house.id}, oldRentPrice: ${oldRentPrice}, newRentPrice: ${house.rentPrice}, refRentPrice: ${refRentPrice}, rentMarkup: ${this.rentMarkup}, currentRentPrice: ${this.currentRentPrice}, lastBuyPrice: ${house.lastBuyPrice}, moneyDepositRate: ${this.moneyDepositRate}, stddev: ${stddev}`);
     }
 
     setHouseSalePrice(house) {

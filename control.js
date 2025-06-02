@@ -34,6 +34,24 @@ class Control {
         this.updateDistributionGraphs();
     }
 
+    setParameter(key, value) {
+        const methodName = 'set' + key.charAt(0).toUpperCase() + key.slice(1);
+        if (this.hasOwnProperty(methodName)) {
+            if (typeof this[methodName] !== 'function') {
+                throw new Error(`Method ${methodName} is not a function on model.`);
+            }
+            this[methodName](value);
+        }
+        else if (this.hasOwnProperty(key)) {
+            console.log(`Setting model property ${key} to ${value} (old value: ${this[key]})`);
+            this[key] = value;
+        }
+        else {
+            throw new Error(`Model does not have method or property ${methodName} or ${key}`);
+        }
+    }
+
+
     initDisplayWidgets() {
         this.runButton = document.getElementById('runButton');
         this.pauseButton = document.getElementById('pauseButton');
@@ -192,7 +210,6 @@ class Control {
         sliderElements.forEach(slider => {
             const key = slider.id;
             const normalizer = slider.dataset.normalizer;
-            const methodName = 'set' + key.charAt(0).toUpperCase() + key.slice(1);
 
             let normalizeFunc = v => v;
             if (normalizer === 'percent') {
@@ -204,11 +221,10 @@ class Control {
             } else if (normalizer === 'monthlyRent') {
                 normalizeFunc = monthlyToWeeklyRent;
             }
-            console.log(`lookup, methodName: ${methodName}`);
 
             function cb(v) {
-                console.log("calling " + methodName);
-                targetObject[methodName](v)
+                console.log(`calling $(targetName}.setParamter(${key}, ${v}) (targetObject: ${targetObject})`);
+                targetObject.setParameter(key, v)
             }
 
             // bindSlider(key, `${key}Value`, v => targetObject[methodName](v), normalizeFunc);
