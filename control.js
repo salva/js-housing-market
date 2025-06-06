@@ -1,16 +1,19 @@
 
-function percentToRatio(value) { return value / 100; }
-function yearsToWeeks(value) { return value * 52; }
-function yearlyToWeeklyRent(value) { return value / 52; }
-function monthlyToWeeklyRent(value) { return value * 12 / 52; }
+function percentToRatio(value) { return value === null ? null : value / 100; }
+function monthlyPercentToRatio(value) { return value === null ? null : value / 100 * 12; }
+function yearsToWeeks(value) { return value === null ? null : value * 52; }
+function yearlyToWeeklyRent(value) { return value === null ? null : value / 52; }
+function monthlyToWeeklyRent(value) { return value === null ? null : value * 12 / 52; }
 
-function ratioToPercent(value) { return value * 100; }
-function weeksToYears(value) { return value / 52; }
-function weeklyToYearlyRent(value) { return value * 52; }
-function weeklyToMonthlyRent(value) { return value * 52 / 12; }
+function ratioToPercent(value) { return value === null ? null : value * 100; }
+function ratioToMonthlyPercent(value) { return value === null ? null : value * 100 / 12; }
+function weeksToYears(value) { return value === null ? null : value / 52; }
+function weeklyToYearlyRent(value) { return value === null ? null : value * 52; }
+function weeklyToMonthlyRent(value) { return value === null ? null : value * 52 / 12; }
 
 function roundTo(value, decimalPlaces) {
-    const factor = Math.round(Math.pow(10, decimalPlaces)+0.1);
+    if (value === null) return null;
+    const factor = Math.round(Math.pow(10, decimalPlaces) + 0.1);
     return Math.round(value * factor) / factor;
 }
 
@@ -50,7 +53,6 @@ class Control {
             throw new Error(`Model does not have method or property ${methodName} or ${key}`);
         }
     }
-
 
     initDisplayWidgets() {
         this.runButton = document.getElementById('runButton');
@@ -131,6 +133,14 @@ class Control {
                     if (config[key].step) {
                         slider.step = ratioToPercent(config[key].step);
                     }
+                } else if (normalizer === 'monthlyPercent') {
+                    console.log(`Setting slider for monthlyPercent ${key}, default value: ${config[key].default} -->${ratioToMonthlyPercent(config[key].default)}`);
+                    slider.min = ratioToMonthlyPercent(config[key].min);
+                    slider.max = ratioToMonthlyPercent(config[key].max);
+                    slider.value = ratioToMonthlyPercent(config[key].default);
+                    if (config[key].step) {
+                        slider.step = ratioToMonthlyPercent(config[key].step);
+                    }
                 } else if (normalizer === 'years') {
                     slider.min = weeksToYears(config[key].min);
                     slider.max = weeksToYears(config[key].max);
@@ -172,11 +182,11 @@ class Control {
         sliderElements.forEach(slider => {
             const key = slider.id;
             const normalizer = slider.dataset.normalizer;
-
-
             let value = parseFloat(slider.value);
             if (normalizer === 'percent') {
                 value = percentToRatio(value);
+            } else if (normalizer === 'monthlyPercent') {
+                value = monthlyPercentToRatio(value);
             } else if (normalizer === 'years') {
                 value = yearsToWeeks(value);
             } else if (normalizer === 'yearlyRent') {
@@ -214,6 +224,8 @@ class Control {
             let normalizeFunc = v => v;
             if (normalizer === 'percent') {
                 normalizeFunc = percentToRatio;
+            } else if (normalizer === 'monthlyPercent') {
+                normalizeFunc = ratioToMonthlyPercent;
             } else if (normalizer === 'years') {
                 normalizeFunc = yearsToWeeks;
             } else if (normalizer === 'yearlyRent') {
@@ -376,7 +388,8 @@ class Control {
 
         Plotly.newPlot('salePriceVsTime', [{ x: [], y: [], mode: 'lines', name: 'Mean sale price' },
                                            { x: [], y: [], mode: 'lines', name: 'Mean just sold sale price' },
-                                           { x: [], y: [], mode: 'lines', name: 'Amortized mean sale price' }],
+                                           { x: [], y: [], mode: 'lines', name: 'Amortized mean sale price' },
+                                           { x: [], y: [], mode: 'lines', name: 'Sale price equivalent to amortized mean rent' }],
                        { title: { text: 'Sale Prices Vs Time' },
                          xaxis: { title: 'Date' },
                          yaxis: { title: 'Price', rangemode: 'tozero' } });
@@ -389,13 +402,27 @@ class Control {
                          xaxis: { title: 'Date' },
                          yaxis: { title: 'Salary', rangemode: 'tozero' } });
 
+        Plotly.newPlot('salePriceVsTimeForSale', [{ x: [], y: [], type: 'scatter', mode: 'markers', marker: { size: 3 }, name: 'For Sale'},
+                                                  { x: [], y: [], type: 'scatter', mode: 'markers', marker: { size: 3 }, name: 'For Rent'}],
+                       { title: { text: 'Sale price VS Time for sale'},
+                         xaxis: { title: 'Time (weeks)', rangemode: 'tozero' },
+                         yaxis: { title: 'Sale Price (€)', rangemode: 'tozero' } });
+
+
         Plotly.newPlot('vacantTime', [{ x: [], y: [], mode: 'lines', name: 'Avg house vacant time' },
                                       { x: [], y: [], mode: 'lines', name: 'Avg citizen looking time' }],
                        { title: { text: 'Looking/renting Times' },
                          xaxis: { title: 'Date' },
                          yaxis: { title: 'Weeks', rangemode: 'tozero' } });
 
-        Plotly.newPlot('rentPriceHist', [{ x: [], type: 'histogram', name: 'RentPrice', xcalendar: 'gregorian'}],
+        Plotly.newPlot('salePriceHist', [{ x: [], type: 'histogram', name: 'For Sale', xcalendar: 'gregorian'},
+                                         { x: [], type: 'histogram', name: 'For Rent', xcalendar: 'gregorian'}],
+                       { title: { text: 'Sale Price' },
+                         shapes: [ { type: 'line', x0: NaN, x1: NaN, y0: 0, y1: 1, yref: 'paper', visible: false,
+                                     line: { color: 'red', width: 2, dash: 'dot' } } ] });
+
+        Plotly.newPlot('rentPriceHist', [{ x: [], type: 'histogram', name: 'Rented', xcalendar: 'gregorian'},
+                                         { x: [], type: 'histogram', name: 'For Rent', xcalendar: 'gregorian'}],
                        { title: { text: 'Rent Price' }});
 
         Plotly.newPlot('rentLengthHist', [{x: [], type: 'histogram', name: 'RentLength', xcalendar: 'gregorian'}],
@@ -456,10 +483,10 @@ class Control {
         Plotly.update('rentPriceVsTime', { x: [t, t, t, t, t],
                                       y: this.cutArgsToShowLength(h.meanRentPriceHousesAll, h.meanRentPriceHousesRented, h.meanRentPriceHousesForRent,
                                                                   h.meanRentPriceHousesRentedInTick, h.currentRentPrice,
-                                                                  h.meanSalePriceMortgagePayment) });
+                                                                  h.meanSalePriceEquivalentMortgagePayment) });
 
         Plotly.update('salePriceVsTime', { x: [t, t],
-                                           y: this.cutArgsToShowLength(h.meanSalePrice, h.meanSalePriceInTick, h.currentSalePrice) });
+                                           y: this.cutArgsToShowLength(h.meanSalePrice, h.meanSalePriceInTick, h.currentSalePrice, h.currentRentPriceEquivalentSalePrice) });
 
         Plotly.update('salaryVsTime', { x: [t, t, t, t],
                                         y: this.cutArgsToShowLength(h.meanSalaryAll, h.meanSalaryLooking, h.meanSalaryRenting, h.meanSalaryOwningTheirHomes) });
@@ -467,7 +494,13 @@ class Control {
         Plotly.update('vacantTime', { x: [t, t],
                                       y: this.cutArgsToShowLength(h.inTickVacantTime, h.inTickLookingTime) });
 
-        Plotly.update('rentPriceHist', { x: [Object.values(m.houses).map((house) => house.rentPrice)] });
+        Plotly.update('salePriceHist', { x: ensureNonEmptyNumericArrays([Array.from(m.housesForSale, (houseId) => m.houses[houseId].salePrice),
+                                                                         Array.from(m.housesForRent, (houseId) => m.houses[houseId].salePrice)]) });
+        Plotly.relayout('salePriceHist', { 'shapes[0].x0': m.currentSalePrice, 'shapes[0].x1': m.currentSalePrice, 'shapes[0].visible': m.currentSalePrice !== null });
+
+        Plotly.update('rentPriceHist', { x: ensureNonEmptyNumericArrays([Array.from(m.housesRented, (houseId) => weeklyToMonthlyRent(m.houses[houseId].rentPrice)),
+                                                                         Array.from(m.housesForRent, (houseId) => weeklyToMonthlyRent(m.houses[houseId].rentPrice))])});
+
         Plotly.update('rentLengthHist', { x: [Array.from(m.housesRented, (houseId) => weeksToYears(m.houses[houseId].rentalDuration))] });
         Plotly.update('salaryHist', { x: ensureNonEmptyNumericArrays([Array.from(m.citizensLooking, (citizenId) => weeklyToYearlyRent(m.citizens[citizenId].salary)),
                                                                       Array.from(m.citizensRenting, (citizenId) => weeklyToYearlyRent(m.citizens[citizenId].salary)),
@@ -476,7 +509,10 @@ class Control {
         Plotly.update('ageHist', { x: ensureNonEmptyNumericArrays([Array.from(m.citizensLooking, (citizenId) => weeksToYears(m.tick - m.citizens[citizenId].lifeStart)),
                                                                    Array.from(m.citizensRenting, (citizenId) => weeksToYears(m.tick - m.citizens[citizenId].lifeStart)),
                                                                    Array.from(m.citizensOwningTheirHomes, (citizenId) => weeksToYears(m.tick - m.citizens[citizenId].lifeStart))]) });
-
+        Plotly.update('salePriceVsTimeForSale', { x: [Array.from(m.housesForSale, (houseId) => m.tick - m.houses[houseId].lastStateChangeTick),
+                                                      Array.from(m.housesForRent, (houseId) => m.tick - m.houses[houseId].lastStateChangeTick)],
+                                                  y: [Array.from(m.housesForSale, (houseId) => m.houses[houseId].salePrice),
+                                                      Array.from(m.housesForRent, (houseId) => m.houses[houseId].salePrice)] });
 
         const binCuts = [0, 1, 3, 6];
         const binMap = [];

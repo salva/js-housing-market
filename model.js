@@ -19,17 +19,23 @@ function shuffleAndTakeN(array, n) {
     array.splice(n);
 }
 
-function mapAndMean(iterable, func) {
+function mean(iterable) {
     let sum = 0;
     let count = 0;
     for (const item of iterable) {
-        sum += func(item);
-        count += 1;
+        if (item !== null && item !== undefined) {
+            sum += item;
+            count += 1;
+        }
     }
     if (count > 0) {
         return sum / count;
     }
     return null;
+}
+
+function mapAndMean(iterable, func) {
+    return mean(Array.from(iterable, func));
 }
 
 function arrayRemoveAt(array, ix) {
@@ -73,7 +79,7 @@ function betaSample(min, max, mean, dispersion) {
 function shiftedGammaSample(shift, mean, dispersion) {
     // console.log(`shiftedGammaSample(shift: ${shift}, mean: ${mean}, dispersion: ${dispersion})`);
     if (mean <= shift) {
-        throw new Error("mean must be above the shift");
+        throw new Error(`mean (${mean}) must be above the shift (${shift})`);
     }
     if (dispersion <= 0 || dispersion >= 1) {
         if (dispersion === 0) { return mean; }
@@ -122,7 +128,10 @@ class Citizen extends Thing {
                 costOfLivingBase, costOfLivingSalaryFactor,
                 rentalAffordabilityRatio, mortgageAffordabilityRatio,
                 surplusSavingRate, rentalInvestmentRate,
-                homeBuyingAge) {
+                homeBuyingAge,
+                minAcceptableExcessYield,
+                saleMarkup, salePriceDrop,
+                rentMarkup, rentPriceDrop) {
         super("_new", tick)
         this.lifeStart = tick - lifeStartAge;
         this.lifeStartAge = lifeStartAge;
@@ -138,6 +147,12 @@ class Citizen extends Thing {
         this.surplusSavingRate = surplusSavingRate;
         this.rentalInvestmentRate = rentalInvestmentRate;
         this.homeBuyingAge = homeBuyingAge;
+        this.minAcceptableExcessYield = minAcceptableExcessYield;
+        this.saleMarkup = saleMarkup;
+        this.salePriceDrop = salePriceDrop;
+        this.rentMarkup = rentMarkup;
+        this.rentPriceDrop = rentPriceDrop;
+
         this.homeBuyingTick = tick + homeBuyingAge - lifeStartAge;
         this.savings = 0;
         this.ownedHouses = [];
@@ -147,7 +162,7 @@ class Citizen extends Thing {
         this.salaryAvailableForRent = 0;
         this.salaryAvailableForMortgage = 0;
 
-        console.log(`new citizen: id: ${this.id}, lifeStart: ${this.lifeStart}, lifespan: ${this.lifespan}, retirementAge: ${retirementAge}, workingEnd: ${this.workingEnd}, lifeEnd: ${this.lifeEnd}, salaryAt20: ${salaryAt20}, lifetimeSalaryGrowthFactor: ${lifetimeSalaryGrowthFactor}, costOfLivingBase: ${costOfLivingBase}, costOfLivingSalaryFactor: ${costOfLivingSalaryFactor}, surplusSavingRate: ${surplusSavingRate}, rentalInvestmentRate: ${rentalInvestmentRate}, homeBuyingAge: ${homeBuyingAge}`);
+        // console.log(`new citizen: id: ${this.id}, lifeStart: ${this.lifeStart}, lifespan: ${this.lifespan}, retirementAge: ${retirementAge}, workingEnd: ${this.workingEnd}, lifeEnd: ${this.lifeEnd}, salaryAt20: ${salaryAt20}, lifetimeSalaryGrowthFactor: ${lifetimeSalaryGrowthFactor}, costOfLivingBase: ${costOfLivingBase}, costOfLivingSalaryFactor: ${costOfLivingSalaryFactor}, surplusSavingRate: ${surplusSavingRate}, rentalInvestmentRate: ${rentalInvestmentRate}, homeBuyingAge: ${homeBuyingAge}`);
 
     }
 }
@@ -164,6 +179,8 @@ class House extends Thing {
         this.mortageEnd = 0;
         this.lastBuyPrice = null;
         this.lastFullBuyPrice = null;
+        this.renovationCost = 0;
+        this.lastRenovationTick = tick;
     }
 }
 
@@ -195,11 +212,17 @@ class HousingMarket {
         this.costOfLivingBase = 100;
         this.costOfLivingSalaryFactor = 0.2;
         this.costOfLivingDispersion = 0.2;
-        this.rentMarkup = 0.20;
+
+        this.saleMarkupMean = 0.10;
+        this.saleMarkupDispersion = 0.05;
+        this.salePriceDropMean = 0.01;
+        this.salePriceDropDispersion = 0.05;
+        this.rentMarkupMean = 0.20;
+        this.rentMarkupDispersion = 0.05;
+        this.rentPriceDropMean = 0.07;
+        this.rentPriceDropDispersion = 0.05;
         this.rentOverload = 0.03;
-        this.saleMarkup = 0.10;
-        this.rentPriceDrop = 0.07;
-        this.salePriceDrop = 0.01;
+
         this.housesConsideredPerStep = 10;
         this.nextCityRentPriceRatio = 0.3;
 
@@ -242,20 +265,25 @@ class HousingMarket {
 
         this.currentRentPrice = null;
         this.currentRentPriceWeight = 0;
+        this.currentRentPriceWeighCutoff = 0.1;
         this.currentRentPriceAmortizationFactor = 0.9;
 
         this.initialSalePrice = 250000.0;
         this.currentSalePrice = null;
         this.currentSalePriceWeight = 0;
-        this.currentSalePriceAmortizationFactor = 0.9;
+        this.currentSalePriceWeighCutoff = 0.1;
+        this.currentSalePriceAmortizationFactor = 0.8;
 
         this.houseMaintenanceCost = 100;
         this.houseConstructionCostMean = 200000;
         this.houseConstructionCostDispersion = 0.2;
 
-        this.minHouseSalePrice = 50000;
-        this.refurbishmentCostMean = 5000;
-        this.refurbishmentCostDispersion = 0.2;
+        this.minRentPrice = 1;
+        this.minSalePrice = 50000;
+        this.renovationCostMean = 5000;
+        this.renovationCostDispersion = 0.2;
+        this.renovationIntervalMean = 52 * 25; // 25 years
+        this.renovationIntervalDispersion = 0.2;
         this.lifeStartAgeMin = 20 * 52;
         this.lifeStartAgeMax = 105 * 52;
         this.lifeStartAgeMean = 28 * 52;
@@ -267,8 +295,8 @@ class HousingMarket {
         this.lifespanMean = 80 * 52;
         this.lifespanDispersion = 0.05;
 
-        this.housesRentedInTick = [];
-        this.housesBoughtInTick = [];
+        this.salePricesInTick = [];
+        this.rentPricesInTick = [];
     }
 
     setParameter(key, value) {
@@ -288,71 +316,110 @@ class HousingMarket {
         }
     }
 
-    setHouseRentPrice(house) {
-        const oldRentPrice = house.rentPrice;
-        const refRentPrice = (this.currentRentPrice ?? (house.lastBuyPrice * (this.moneyDepositRate / 52) * (1 + this.rentOverload)));
-        const stddev = this.rentMarkup * 0.2;
-        house.rentPrice = Math.max(1.0, refRentPrice * jStat.normal.sample(1.0 + this.rentMarkup, stddev));
+    computeHouseRentPrice(house) {
+        let refRentPrice = this.currentRentPrice;
+        if (refRentPrice === null) {
+            let refSalePrice = this.currentSalePrice;
+
+            if (refSalePrice === null) {
+                refSalePrice = house.lastBuyPrice ?? this.initialSalePrice;
+            }
+            refSalePrice = refSalePrice  * (1 + this.buyingTaxes) + this.fixedBuyingCosts;
+            refRentPrice = refSalePrice * this.moneyDepositRate / 52.0 + this.houseMaintenanceCost;
+        }
+        const price = refRentPrice * (1 + house.owner.rentMarkup);
+        // console.log(`computeHouseRentPrice: refRentPrice: ${refRentPrice}, owner: ${house.owner.id}, rentMarkup: ${house.owner.rentMarkup}, price: ${price}`);
+        return Math.max(this.minRentPrice, price);
     }
 
-    setHouseSalePrice(house) {
-        const rentPrice = house.rentPrice;
-        if ((rentPrice !== null) && (rentPrice > 0)) {
-            // TODO: this algorithm needs improvement, it should take more factors into account
-            house.salePrice = rentPrice * 52 / this.moneyDepositRate * (1 + this.saleMarkup);
+    computeHouseRenovationCost(house) {
+        return ((house.nextRenovationTick < this.tick) ? house.nextRenovationCost : 0);
+    }
+
+    computeHouseForSaleSalePrice(house) {
+        // TODO: this algorithm needs improvement, it should take more factors into account
+        let refPrice = this.currentSalePrice;
+        if (refPrice === null) {
+            if (this.currentRentPrice > 0) {
+                refPrice = this.currentRentPrice * 52 / this.moneyDepositRate;
+            }
+            else {
+                refPrice = this.initialSalePrice;
+            }
         }
-        if (this.currentSalePrice === null) {
-            // if (house.salePrice === null) {
-            house.salePrice = this.initialSalePrice;
-            // }
-        }
-        else {
-            house.salePrice = this.currentSalePrice * (1 + this.saleMarkup);
-        }
-        // console.log(`setHouseSalePrice: house ${house.id}, rentPrice: ${house.rentPrice}, salePrice: ${house.salePrice}, amortized maintenance cost: ${this.houseMaintenanceCost}, rentPrice: ${rentPrice}, money deposit rate: ${this.moneyDepositRate}, saleMarkup: ${this.saleMarkup}, currentSalePrice: ${this.currentSalePrice}`);
+
+        // const vendorRenovationCost = this.computeHouseRenovationCost(house) * Math.random();
+        const saleMarkup = (house.owner === null
+                            ? shiftedGammaSample(0, this.saleMarkupMean, this.saleMarkupDispersion)
+                            : house.owner.saleMarkup);
+        const price = (1 + saleMarkup) * refPrice;
+        return Math.max(this.minSalePrice, price);
+    }
+
+    computeHouseForRentSalePrice(house, rentPrice) {
+        const refPrice = (rentPrice - this.houseMaintenanceCost) * 52.0 / this.moneyDepositRate;
+        const price = (1 + house.owner.saleMarkup) * refPrice;
+        // console.log(`computeHouseForRentSalePrice: refPrice: ${refPrice}, rentPrice: ${rentPrice}, saleMarkup: ${house.owner.saleMarkup}, moneyDepositRate: ${this.moneyDepositRate}, houseMaintenanceCost: ${this.houseMaintenanceCost}, price: ${price}`);
+        const altPrice = this.computeHouseForSaleSalePrice(house);
+        return Math.max(this.minSalePrice, price, altPrice);
+    }
+
+    computeHouseRemovationCost(house) {
+        const oldRenovationCost = house.renovationCost;
+        const ticks = Math.max();
+        const cost = shiftedGammaSample(0, this.renovationCostMean, this.renovationCostDispersion);
+    }
+
+    setHouseRenovationCost(house) {
+        const cost = shiftedGammaSample(0, this.renovationCostMean, this.renovationCostDispersion);
+        house.renovationCost = cost;
+        house.lastRenovationTick = this.tick;
+        // console.log(`House ${house.id} renovation cost set to ${cost}`);
     }
 
     setHouseState(house, state) {
         const oldState = house.state;
         if (state !== oldState) {
-
-            //if (oldState === "rented") {
-            //    console.trace(`House ${house.id} is being set to state ${state} from rented, remaining ticks: ${house.rentalEnd - this.tick}`);
-            //}
-
             const id = house.id;
+            house.newState(state, this.tick);
+
             this.housesForRent.delete(id);
             this.housesForSale.delete(id);
             this.housesRented.delete(id);
             this.housesOccupiedByOwner.delete(id);
-            if (state === "forSale") {
-                this.housesForSale.add(house.id);
-                this.setHouseSalePrice(house);
-            }
-            else if (state === "forRent") {
-                this.housesForRent.add(house.id);
-                this.setHouseRentPrice(house);
-            }
-            else if (state === "forSaleOrRent") {
-                this.housesForSale.add(house.id);
-                this.setHouseSalePrice(house);
-                this.housesForRent.add(house.id);
-                this.setHouseRentPrice(house);
-            }
-            else if (state === "rented") {
-                this.housesRented.add(house.id);
-            }
-            else if (state === "occupiedByOwner") {
-                this.housesOccupiedByOwner.add(house.id);
-            }
-            else if (state === "removed") {
+
+            if (state === "removed") {
                 // The bulldozer has come
-                delete this.houses[house.id];
+                delete this.houses[id];
             }
             else {
-                console.warn("Unknown house state: " + state);
+                if (state === "forSale") {
+                    this.housesForSale.add(id);
+                    house.salePrice = this.computeHouseForSaleSalePrice(house);
+                    // console.log(`setHouseState: house ${id} for sale, sale price: ${house.salePrice}`);
+                }
+                else if (state === "forRent") {
+                    this.housesForRent.add(id);
+                    const rentPrice = this.computeHouseRentPrice(house);
+                    house.rentPrice = rentPrice;
+
+                    // houses available for rent can also be bought most of the time if the price is right.
+                    // this.housesForSale.add(id);
+                    house.salePrice = this.computeHouseForRentSalePrice(house, rentPrice);
+                    // console.log(`setHouseState: house ${id} for rent, sale price: ${house.salePrice}, rent price: ${rentPrice}`);
+                }
+                else if (state === "rented") {
+                    this.housesRented.add(id);
+                }
+                else if (state === "occupiedByOwner") {
+                    this.housesOccupiedByOwner.add(id);
+                }
+                else {
+                    console.warn("Unknown house state: " + state);
+                }
+
+                house.renovationCost = this.computeHouseRenovationCost(house);
             }
-            house.newState(state, this.tick);
         }
     }
 
@@ -384,10 +451,16 @@ class HousingMarket {
         }
     }
 
+    renovateHouse(house) {
+        this.nextRenovationTick = this.tick + shiftedGammaSample(0, this.renovationIntervalMean, this.renovationIntervalDispersion);
+        this.nextRenovationCost = shiftedGammaSample(0, this.renovationCostMean, this.renovationCostDispersion);
+    }
+
     addHouse() {
         const house = new House(this.tick);
-        console.log("Adding house " + house.id +" (" + house + ")");
+        // console.log("Adding house " + house.id +" (" + house + ")");
         this.houses[house.id] = house;
+        this.renovateHouse(house);
         this.setHouseState(house, "forSale");
     }
 
@@ -413,17 +486,17 @@ class HousingMarket {
         this.setHouseState(house, "rented");
         this.setCitizenState(citizen, "renting");
 
-        this.housesRentedInTick.push(house);
+        this.rentPricesInTick.push(house.rentPrice);
     }
 
     endRentingContract(house) {
         const resident = house.resident;
         if (resident === null) {
-            console.warn("endRentingContract for house " + house.id + " with no resident");
+            //console.warn("endRentingContract for house " + house.id + " with no resident");
             return;
         }
         if (resident.state !== "renting") {
-            console.warn("endRentingContract for not rented house " + house.id);
+            //console.warn("endRentingContract for not rented house " + house.id);
             return;
         }
 
@@ -433,7 +506,7 @@ class HousingMarket {
         house.resident = null;
         // house.rentalEnd = 0;
 
-        this.setHouseState(house, "forSaleOrRent");
+        this.setHouseState(house, "forRent");
         this.setCitizenState(citizen, "looking");
     }
 
@@ -495,19 +568,31 @@ class HousingMarket {
         const surplusSavingRate = shiftedGammaSample(0, this.surplusSavingRateMean, this.surplusSavingRateDispersion);
         const rentalInvestmentRate = shiftedGammaSample(0, this.rentalInvestmentRateMean, this.rentalInvestmentRateDispersion);
         const homeBuyingAge = shiftedGammaSample(18*52, this.homeBuyingAgeMean, this.homeBuyingAgeDispersion);
+        const minAcceptableExcessYield = shiftedGammaSample(0, this.minAcceptableExcessYieldMean, this.minAcceptableExcessYieldDispersion);
+
+        const saleMarkup = shiftedGammaSample(0, this.saleMarkupMean, this.saleMarkupDispersion);
+        const salePriceDrop = shiftedGammaSample(0, this.salePriceDropMean / 52, this.salePriceDropDispersion);
+        const rentMarkup = shiftedGammaSample(0, this.rentMarkupMean, this.rentMarkupDispersion);
+        const rentPriceDrop = shiftedGammaSample(0, this.rentPriceDropMean / 52, this.rentPriceDropDispersion);
+        console.log(`Citizen rentPriceDrop: ${rentPriceDrop}, yearlyRentPriceDropMean: ${this.rentPriceDropMean}, rentPriceDropMean: ${this.rentPriceDropMean / 52}, rentPriceDropDispersion: ${this.rentPriceDropDispersion}`);
+
         const citizen = new Citizen(this.tick, lifeStartAge, lifespan, this.retirementAge,
                                     salaryAt20, lifetimeSalaryGrowthFactor,
                                     costOfLivingBase, costOfLivingSalaryFactor,
                                     rentAffordabilityRatio, mortgageAffordabilityRatio,
                                     surplusSavingRate, rentalInvestmentRate,
-                                    homeBuyingAge);
+                                    homeBuyingAge,
+                                    minAcceptableExcessYield,
+                                    saleMarkup, salePriceDrop,
+                                    rentMarkup, rentPriceDrop);
+
         this.citizens[citizen.id] = citizen;
         this.setCitizenState(citizen, "looking");
         this.updateCitizenMoneys(citizen);
     }
 
     buyHouse(citizen, house) {
-        if (house.state !== "forSale" && house.state !== "forSaleOrRent") {
+        if (house.state !== "forSale" && house.state !== "forRent") {
             console.warn("House is not for sale");
             return;
         }
@@ -535,8 +620,8 @@ class HousingMarket {
         house.owner = citizen;
         house.lastBuyPrice = price;
         house.lastFullBuyPrice = fullPrice;
-        this.setHouseState(house, "forSaleOrRent");
-        this.housesBoughtInTick.push(house);
+        this.setHouseState(house, "forRent");
+        this.salePricesInTick.push(price);
 
         // console.log(`house bought: citizen: ${citizen.id}, house: ${house.id}, price: ${price}, mortgage: ${mortgage}, mortgagePayment: ${house.mortgagePayment}, lastBuyPrice: ${house.lastBuyPrice}, lastFullBuyPrice: ${house.lastFullBuyPrice}, savings: ${citizen.savings}, ownedHouses: ${citizen.ownedHouses.length}`);
     }
@@ -575,7 +660,7 @@ class HousingMarket {
 
         house.resident = null;
         citizen.residence = null;
-        this.setHouseState(house, "forSaleOrRent");
+        this.setHouseState(house, "forRent");
         this.setCitizenState(citizen, "looking");
     }
 
@@ -615,7 +700,7 @@ class HousingMarket {
     }
 
     rmCitizen(citizen) {
-        console.log("Removing citizen " + citizen.id + " (" + citizen + ")");
+        //console.log("Removing citizen " + citizen.id + " (" + citizen + ")");
         if (citizen.state === "renting") {
             this.endRentingContract(citizen.residence);
         }
@@ -625,6 +710,7 @@ class HousingMarket {
 
         for (const house of citizen.ownedHouses) {
             this.disownHouse(house);
+            this.setHouseRenovationCost(house);
         }
 
         this.setCitizenState(citizen, "removed");
@@ -633,7 +719,7 @@ class HousingMarket {
     adjustPopulation() {
         const diff = this.nCitizens - Object.keys(this.citizens).length;
         if (diff !== 0) {
-            console.log(`adjustPopulation: diff: ${diff}, nCitizens: ${this.nCitizens}, current: ${Object.keys(this.citizens).length}`);
+            console.info(`adjustPopulation: diff: ${diff}, nCitizens: ${this.nCitizens}, current: ${Object.keys(this.citizens).length}`);
             if (diff > 0) {
                 for (let i = 0; i < diff; i++) {
                     this.addCitizen();
@@ -658,7 +744,7 @@ class HousingMarket {
     adjustHousing() {
         const diff = this.nHouses - Object.keys(this.houses).length;
         if (diff !== 0) {
-            console.log(`adjustHousing: diff: ${diff}, nHouses: ${this.nHouses}, current: ${Object.keys(this.houses).length}`);
+            console.info(`adjustHousing: diff: ${diff}, nHouses: ${this.nHouses}, current: ${Object.keys(this.houses).length}`);
             if (diff > 0) {
                 // console.log("Adding " + diff + " houses");
                 this.addNHouses(diff);
@@ -686,7 +772,7 @@ class HousingMarket {
                 count += 1;
             }
         }
-        console.log(`opEndRentals: ended ${count} rental contracts at tick ${this.tick}`);
+        //console.log(`opEndRentals: ended ${count} rental contracts at tick ${this.tick}`);
     }
 
     pickBestHouseN(housesAvailableIds, n, priceFunc, log=false) {
@@ -705,8 +791,13 @@ class HousingMarket {
         }
         const bestHouse = (bestIx !== null) ? this.houses[housesAvailableIds[bestIx]] : null;
         if (log) {
+            const allPrices = Array.from(housesAvailableIds, id => priceFunc(this.houses[id]));
+            const min = Math.min(...allPrices);
+            const max = Math.max(...allPrices);
+            const minConsidered = Math.min(...prices);
+            const maxConsidered = Math.max(...prices);
             const sortedPrices = prices.slice().sort((a, b) => a - b);
-            console.log(`best house: ${bestHouse ? bestHouse.id : "none"}, price: ${bestPrice}, n: ${n}, n1: ${n1}, prices: ${sortedPrices}`);
+            console.log(`best house: ${bestHouse ? bestHouse.id : "none"}, price: ${bestPrice}, n: ${n}, n1: ${n1}, min: ${min}, max: ${max}, minConsidered: ${minConsidered}, maxConsidered: ${maxConsidered}`);
         }
         return [bestIx, bestHouse, bestPrice];
     }
@@ -753,7 +844,7 @@ class HousingMarket {
     }
 
     opCitizensBuy() {
-        const houseIds = Array.from(this.housesForSale);
+        const houseIds = Array.from(this.housesForSale).concat(Array.from(this.housesForRent));
 
         // If can find house for sale at a good price it buys it. Otherwise it rents.
         // TODO:
@@ -770,7 +861,8 @@ class HousingMarket {
             if (citizen.homeBuyingTick > this.tick) {
                 continue
             }
-            const [houseIdsIx, house, price] = this.pickBestHouseN(houseIds, this.housesConsideredPerStep, (house) => house.salePrice);
+
+            const [houseIdsIx, house, price] = this.pickBestHouseN(houseIds, this.housesConsideredPerStep, (house) => house.salePrice, false);
             if (house) {
                 let availableForMortgagePayment;
                 let availableSavings;
@@ -796,7 +888,7 @@ class HousingMarket {
                         const expectedRentPrice = this.currentRentPrice;
                         if (expectedRentPrice !== null) {
                             const excessYield = (expectedRentPrice * 52) / fullPrice - this.moneyDepositRate;
-                            if (excessYield < 0.01) {
+                            if (excessYield < citizen.minAcceptableExcessYield) {
                                 continue
                             }
                         }
@@ -818,26 +910,24 @@ class HousingMarket {
         }
     }
 
-    amortizedMean(oldValue, oldWeight, amortizationFactor, values, cb) {
+    computeAmortizedMean(oldValue, oldWeight, amortizationFactor, weightCutoff, values) {
         let sum = 0;
         let count = 0;
-        let vs = [];
-        for (const value of values) {
-            const v = cb(value);
+        for (const v of values) {
             if (v !== null) {
                 sum += v;
                 count += 1;
-                vs.push(v);
             }
         }
-        if (count > 0) {
-            const amortizedOldWeight = oldWeight * amortizationFactor;
-            const newWeight = count + amortizedOldWeight;
-            const mean = (amortizedOldWeight * (oldValue||0) + sum) / newWeight;
-            // console.log(`amortizedMean: oldValue: ${oldValue}, oldWeight: ${oldWeight}, amortizationFactor: ${amortizationFactor}, sum: ${sum}, count: ${count}, newWeight: ${newWeight}, mean: ${mean}, vs: ${vs}`);
-            return [mean, newWeight];
+        const amortizedOldWeight = oldWeight * amortizationFactor;
+        const newWeight = count + amortizedOldWeight;
+        if (newWeight < weightCutoff) {
+            return [null, 0];
         }
-        return [oldValue, oldWeight];
+        const mean = (amortizedOldWeight * (oldValue||0) + sum) / newWeight;
+        // console.log(`computeAmortizedMean: oldValue: ${oldValue}, oldWeight: ${oldWeight}, amortizationFactor: ${amortizationFactor}, weightCutoff: ${weightCutoff}, sum: ${sum}, count: ${count}, newWeight: ${newWeight}, mean: ${mean}, values: ${values}`);
+
+        return [mean, newWeight];
     }
 
     updateCitizenMoneys(citizen) {
@@ -862,36 +952,61 @@ class HousingMarket {
     opRentMetrics() {
         const oldRentPrice = this.currentRentPrice;
         const oldRentPriceWeight = this.currentRentPriceWeight;
-        [this.currentRentPrice, this.currentRentPriceWeight] = this.amortizedMean(this.currentRentPrice, this.currentRentPriceWeight,
-                                                                                  this.currentRentPriceAmortizationFactor,
-                                                                                  this.housesRentedInTick, (house) => house.rentPrice);
-        console.log(`opRentMetrics: oldRentPrice: ${oldRentPrice}, currentRentPrice: ${this.currentRentPrice}, oldRentPriceWeight: ${oldRentPriceWeight}, currentRentPriceWeight: ${this.currentRentPriceWeight}, currentRentPriceAmortizationFactor: ${this.currentRentPriceAmortizationFactor}, housesRentedInTick: ${this.housesRentedInTick.length}/${this.housesRented.size}`);
+        [this.currentRentPrice, this.currentRentPriceWeight] =
+            this.computeAmortizedMean(this.currentRentPrice, this.currentRentPriceWeight,
+                                      this.currentRentPriceAmortizationFactor,
+                                      this.currentRentPriceWeighCutoff,
+                                      this.rentPricesInTick);
+        //console.log(`opRentMetrics: oldRentPrice: ${oldRentPrice}, currentRentPrice: ${this.currentRentPrice}, oldRentPriceWeight: ${oldRentPriceWeight}, currentRentPriceWeight: ${this.currentRentPriceWeight}, currentRentPriceAmortizationFactor: ${this.currentRentPriceAmortizationFactor}`);
     }
 
     opBuyMetrics() {
-        [this.currentSalePrice, this.currentSalePriceWeight] = this.amortizedMean(this.currentSalePrice, this.currentSalePriceWeight,
-                                                                                  this.currentSalePriceAmortizationFactor,
-                                                                                  this.housesBoughtInTick, (house) => house.lastBuyPrice);
+        [this.currentSalePrice, this.currentSalePriceWeight] =
+            this.computeAmortizedMean(this.currentSalePrice, this.currentSalePriceWeight,
+                                      this.currentSalePriceAmortizationFactor,
+                                      this.currentSalePriceWeighCutoff,
+                                      this.salePricesInTick);
     }
 
-    updateRentPrice(house) {
-        const newPrice = house.rentPrice * (1.0 - this.rentPriceDrop);
-
-        // console.log(`House ${house.id}, current rent price: ${house.rentPrice}, next price: ${newPrice}, amortized maintenance cost: ${this.houseMaintenanceCost}`);
-        if (newPrice > this.houseMaintenanceCost) {
-            house.rentPrice = newPrice;
-        }
+    updateHouseRentPrice(house) {
+        const oldPrice = house.rentPrice;
+        const newPrice = oldPrice * (1.0 - house.owner.rentPriceDrop);
+        house.rentPrice = Math.max(this.minRentPrice, newPrice);
+        console.log(`updateHouseRentPrice: house ${house.id}, old rent price:${oldPrice}, new rent price: ${house.rentPrice}, minRentPrice: ${this.minRentPrice}, rentPriceDrop: ${house.owner.rentPriceDrop}, price drop: ${Math.round(1000 * ((house.rentPrice - oldPrice) / oldPrice)) / 10}%`);
     }
 
-    updateSalePrice(house) {
+    updateHouseSalePrice(house) {
         const oldPrice = house.salePrice;
-        house.salePrice = Math.max(1, house.salePrice * (1 - this.salePriceDrop));
-        // console.log(`updateSalePrice: House ${house.id}, old salePrice: ${oldPrice}, salePrice: ${house.salePrice}`);
+        const salePriceDrop = (house.owner === null
+                               ? shiftedGammaSample(0, this.salePriceDropMean / 52.0, this.salePriceDropDispersion)
+                               : house.owner.salePriceDrop);
+
+        if (house.state === 'forRent') {
+            if (house.owner === null) {
+                log.warn(`updateHouseSalePrice[forRent]: house ${house.id} has no owner!!!`);
+            }
+            const equivalentPrice = this.computeHouseForRentSalePrice(house, house.rentPrice);
+            house.salePrice = Math.max(this.minSalePrice, equivalentPrice, oldPrice * (1.0 - salePriceDrop));
+        }
+        else if (house.state === 'forSale') {
+            house.salePrice = Math.max(this.minSalePrice, oldPrice * (1 - salePriceDrop));
+            // console.log(`salePriceDrop: ${salePriceDrop}, house: ${house.id}, state: ${house.state}, old sale price: ${oldPrice}, this.salePriceDropMean: ${this.salePriceDropMean}, this.salePriceDropDispersion: ${this.salePriceDropDispersion}, new sale price: ${house.salePrice}`);
+
+        }
+        else {
+            console.warn("updating price of house that is not for sale or rent: " + house.id);
+        }
+
+        // console.log(`updateHouseSalePrice: old sale price: ${oldPrice}, sale price drop: ${salePriceDrop}, new sale price: ${house.salePrice}, reduction: ${Math.round(1000 * ((house.salePrice - oldPrice) / oldPrice)) / 10}%`);
     }
 
     opUpdatePrices() {
-        this.housesForRent.forEach((houseId) => { this.updateRentPrice(this.houses[houseId]) });
-        this.housesForSale.forEach((houseId) => { this.updateSalePrice(this.houses[houseId]) });
+        this.housesForRent.forEach((houseId) => {
+            const house = this.houses[houseId];
+            this.updateHouseRentPrice(house);
+            this.updateHouseSalePrice(house);
+        });
+        this.housesForSale.forEach((houseId) => { this.updateHouseSalePrice(this.houses[houseId]) });
     }
 
     computeCitizenSalary(citizen) {
@@ -968,23 +1083,25 @@ class HousingMarket {
     step() {
         this.tick += 1;
 
+        this.opUpdatePrices();
+
         this.adjustHousing();
         this.adjustPopulation();
         this.opEndRentals();
 
         this.opUpdateCitizenMoneys();
 
-        this.housesBoughtInTick = [];
+        this.salePricesInTick = [];
         this.opCitizensRent();
         this.opRentMetrics();
 
-        this.housesRentedInTick = [];
+        this.rentPricesInTick = [];
         this.opCitizensBuy();
         this.opBuyMetrics();
 
         this.opCitizensDie();
 
-        this.opUpdatePrices();
+
         this.opSavings();
         this.opExternalMetrics();
     }
@@ -1018,11 +1135,12 @@ class History {
         this.meanRentPriceHousesRented = [];
         this.meanRentPriceHousesRentedInTick = [];
         this.currentRentPrice = [];
-        this.meanSalePriceMortgagePayment = [];
+        this.meanSalePriceEquivalentMortgagePayment = [];
 
         this.meanSalePrice = [];
         this.meanSalePriceInTick = [];
         this.currentSalePrice = [];
+        this.currentRentPriceEquivalentSalePrice = [];
 
         this.houseVacantTime = [];
 
@@ -1056,6 +1174,8 @@ class History {
         this.citizensOwningTheirHomes.push(model.citizensOwningTheirHomes.size);
 
         const meanRentPriceHousesForRent = mapAndMean(model.housesForRent, (houseId) => houses[houseId].rentPrice);
+        //console.log(`meanRentPriceHousesForRent: ${meanRentPriceHousesForRent}, housesForRent: ${model.housesForRent.size}, rentPrices: ${Array.from(model.housesForRent).map(houseId => houses[houseId].rentPrice)}`);
+
         this.meanRentPriceHousesForRent.push(weeklyToMonthlyRent(meanRentPriceHousesForRent));
 
         const meanRentPriceHousesRented = mapAndMean(model.housesRented, (houseId) => houses[houseId].rentPrice);
@@ -1067,17 +1187,22 @@ class History {
               ( model.housesForRent.length + model.housesRented.length );
         this.meanRentPriceHousesAll.push(weeklyToMonthlyRent(meanRentPriceHousesAll));
 
-        this.meanRentPriceHousesRentedInTick.push(mapAndMean(model.housesRentedInTick, (house) => house.rentPrice));
+        this.meanRentPriceHousesRentedInTick.push(mean(model.rentPricesInTick));
         this.currentRentPrice.push(weeklyToMonthlyRent(model.currentRentPrice));
 
         const meanSalePrice = mapAndMean(model.housesForSale, (houseId) => houses[houseId].salePrice);
         this.meanSalePrice.push(meanSalePrice);
-        this.meanSalePriceInTick.push(mapAndMean(model.housesBoughtInTick, (house) => house.salePrice));
+        this.meanSalePriceInTick.push(mean(model.salePricesInTick));
         this.currentSalePrice.push(model.currentSalePrice);
+        this.currentRentPriceEquivalentSalePrice.push(model.currentRentPrice === null
+                                                      ? null
+                                                      : model.currentRentPrice * 52.0 / model.moneyDepositRate)
 
-        const mortgagePayment = computeWeeklyMortgagePayment(model.currentSalePrice, model.mortgageRate, model.maxMortgageDuration);
-        this.meanSalePriceMortgagePayment.push(weeklyToMonthlyRent(mortgagePayment));
-        console.log(`equivalent mortgagePayment: ${mortgagePayment}, currentSalePrice: ${model.currentSalePrice}, mortgageRate: ${model.mortgageRate}, maxMortgageDuration: ${model.maxMortgageDuration}`);
+        const equivalentMortgagePayment = ( model.currentSalePrice === null
+                                            ? null
+                                            : computeWeeklyMortgagePayment(model.currentSalePrice, model.mortgageRate, model.maxMortgageDuration));
+        this.meanSalePriceEquivalentMortgagePayment.push(weeklyToMonthlyRent(equivalentMortgagePayment));
+        //console.log(`equivalent equivalentMortgagePayment: ${equivalentMortgagePayment}, currentSalePrice: ${model.currentSalePrice}, mortgageRate: ${model.mortgageRate}, maxMortgageDuration: ${model.maxMortgageDuration}`);
 
         const meanSalaryRentingMean = mapAndMean(model.citizensRenting, (citizenId) => citizens[citizenId].salary);
         const meanSalaryLookingMean = mapAndMean(model.citizensLooking, (citizenId) => citizens[citizenId].salary);
@@ -1104,13 +1229,5 @@ class History {
 
 
         this.houseVacantTime.push(mapAndMean(model.housesForRent, (houseId) => model.tick - houses[houseId].creationTick));
-
-        this.inTickRent.push(mapAndMean(model.housesRentedInTick, (house) => house.rentPrice));
-        this.inTickAvailableForRent.push(mapAndMean(model.housesRentedInTick, (house) => ((house.state === "rented") ? model.salaryAvailableForRent(house.resident) : null)));
-        this.inTickVacantTime.push(mapAndMean(model.housesRentedInTick, (house) => house.vacantTime));
-        this.inTickLookingTime.push(mapAndMean(model.housesRentedInTick, (house) => house.resident.lookingTime));
-
-
-
     }
 }

@@ -1,13 +1,13 @@
 const config = {
     nCitizens: {
         min: 0,
-        max: 4000,
-        default: 2000
+        max: 20000,
+        default: 5000,
     },
     nHouses: {
         min: 0,
-        max: 4000,
-        default: 1800
+        max: 20000,
+        default: 4500,
     },
     rentAffordabilityRatioMean: {
         min: 0.0,
@@ -44,36 +44,55 @@ const config = {
         max: 1,
         default: 0.2,
     },
-    saleMarkup: {
+    saleMarkupMean: {
         min: 0.0,
         max: 1.0,
         default: 0.10
     },
-    rentMarkup: {
+    saleMarkupDispersion: {
+        min: 0.0,
+        max: 0.2,
+        default: 0.05
+    },
+    salePriceDropMean: {
+        min: 0.0 * 12,
+        max: 0.5 * 12,
+        default: 0.01 * 52,
+    },
+    salePriceDropDispersion: {
+        min: 0.0,
+        max: 0.2,
+        default: 0.05
+    },
+    rentMarkupMean: {
         min: 0.0,
         max: 1.0,
         default: 0.15
     },
-
+    rentMarkupDispersion: {
+        min: 0.0,
+        max: 0.2,
+        default: 0.05
+    },
+    rentPriceDropMean: {
+        min: 0.0 * 12,
+        max: 0.5 * 12,
+        default: 0.03 * 52,
+    },
+    rentPriceDropDispersion: {
+        min: 0.0,
+        max: 0.2,
+        default: 0.05
+    },
     minSalePrice: {
         min: 0,
         max: 1000000,
         default: 40000,
     },
-    salePriceDrop: {
-        min: 0.0,
-        max: 1.0,
-        default: 0.01
-    },
-    rentPriceDrop: {
-        min: 0.0,
-        max: 1.0,
-        default: 0.05
-    },
     housesConsideredPerStep: {
         min: 1,
         max: 50,
-        default: 10
+        default: 25
     },
     rentalDurationMean: {
         min: 0,
@@ -208,17 +227,17 @@ const config = {
     minAcceptableExcessYieldMean: {
         min: 0.0,
         max: 30,
-        default: 2.0
+        default: 0.02
     },
     minAcceptableExcessYieldDispersion: {
         min: 0.0,
         max: 1.0,
-        default: 0.2
+        default: 0.05
     },
-    minHouseSalePriceMean: {
+    minSalePrice: {
         min: 0,
         max: 1000000,
-        default: 60000,
+        default: 20000,
     },
     houseConstructionCostMean: {
         min: 0,
@@ -230,12 +249,12 @@ const config = {
         max: 0.5,
         default: 0.1
     },
-    refurbishmentCostMean: {
+    renovationCostMean: {
         min: 0,
         max: 1000000,
         default: 60000,
     },
-    refurbishmentCostDispersion: {
+    renovationCostDispersion: {
         min: 0.0,
         max: 0.5,
         default: 0.1
