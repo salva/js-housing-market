@@ -57,7 +57,7 @@ const config = {
     salePriceDropMean: {
         min: 0.0 * 12,
         max: 0.5 * 12,
-        default: 0.01 * 52,
+        default: 0.05 * 12,
     },
     salePriceDropDispersion: {
         min: 0.0,
@@ -67,7 +67,7 @@ const config = {
     rentMarkupMean: {
         min: 0.0,
         max: 1.0,
-        default: 0.15
+        default: 0.10
     },
     rentMarkupDispersion: {
         min: 0.0,
@@ -77,17 +77,12 @@ const config = {
     rentPriceDropMean: {
         min: 0.0 * 12,
         max: 0.5 * 12,
-        default: 0.03 * 52,
+        default: 0.10 * 12
     },
     rentPriceDropDispersion: {
         min: 0.0,
         max: 0.2,
         default: 0.05
-    },
-    minSalePrice: {
-        min: 0,
-        max: 1000000,
-        default: 40000,
     },
     housesConsideredPerStep: {
         min: 1,
@@ -216,7 +211,7 @@ const config = {
     homeBuyingAgeMean: {
         min: 18 * 52,
         max: 80 * 52,
-        default: 35 * 52
+        default: 38 * 52
     },
     homeBuyingAgeDispersion: {
         min: 0.005,
@@ -236,8 +231,13 @@ const config = {
     },
     minSalePrice: {
         min: 0,
-        max: 1000000,
-        default: 20000,
+        max: 100000,
+        default: 5000,
+    },
+    minRentPrice: {
+        min: 0,
+        max: 2000 * 12 / 52,
+        default: 20 * 12 / 52,
     },
     houseConstructionCostMean: {
         min: 0,
@@ -262,6 +262,6 @@ const config = {
     houseMaintenanceCost: {
         min: 0,
         max: 200000 / 52,
-        default: 6000 / 52,
+        default: 2000 / 52,
     },
 };

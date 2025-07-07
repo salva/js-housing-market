@@ -408,6 +408,10 @@ class Control {
                          xaxis: { title: 'Time (weeks)', rangemode: 'tozero' },
                          yaxis: { title: 'Sale Price (€)', rangemode: 'tozero' } });
 
+        Plotly.newPlot('rentPriceVsTimeForRent', [{ x: [], y: [], type: 'scatter', mode: 'markers', marker: { size: 3 }, name: 'For Rent'}],
+                       { title: { text: 'Rent price VS Time for rent'},
+                         xaxis: { title: 'Time (weeks)', rangemode: 'tozero' },
+                         yaxis: { title: 'Rent Price (€)', rangemode: 'tozero' } });
 
         Plotly.newPlot('vacantTime', [{ x: [], y: [], mode: 'lines', name: 'Avg house vacant time' },
                                       { x: [], y: [], mode: 'lines', name: 'Avg citizen looking time' }],
@@ -459,6 +463,12 @@ class Control {
                                           Math.round(weeksToYears(config.lifespanMean.max * 1.1))],
                                   title: 'Age (years)' },
                          yaxis: { title: 'Salary (€)', rangemode: 'tozero' } });
+        Plotly.newPlot('disposableIncomeVsHousingCost', [{ x: [], y: [], type: 'scatter', mode: 'markers', marker: { size: 3 }, name: 'Looking for a home' },
+                                                         { x: [], y: [], type: 'scatter', mode: 'markers', marker: { size: 3 }, name: 'Renting their home' },
+                                                         { x: [], y: [], type: 'scatter', mode: 'markers', marker: { size: 3 }, name: 'Owning their home' }],
+                       { title: { text: 'Income available for housing vs real cost' },
+                         xaxis: { title: 'Income available for housing (€)' },
+                         yaxis: { title: 'Real cost of housing (€)', rangemode: 'tozero' } });
     }
 
     cutToShowLength(arg) {
@@ -513,6 +523,21 @@ class Control {
                                                       Array.from(m.housesForRent, (houseId) => m.tick - m.houses[houseId].lastStateChangeTick)],
                                                   y: [Array.from(m.housesForSale, (houseId) => m.houses[houseId].salePrice),
                                                       Array.from(m.housesForRent, (houseId) => m.houses[houseId].salePrice)] });
+        Plotly.update('rentPriceVsTimeForRent', { x: [Array.from(m.housesForRent, (houseId) => m.tick - m.houses[houseId].lastStateChangeTick)],
+                                                  y: [Array.from(m.housesForRent, (houseId) => weeklyToMonthlyRent(m.houses[houseId].rentPrice))] });
+
+        const disposableIncome = {};
+        for (const [citizenId, citizen] of Object.entries(m.citizens)) {
+            disposableIncome[citizenId] = weeklyToYearlyRent(citizen.salary - citizen.costOfLiving);
+        }
+
+        Plotly.update('disposableIncomeVsHousingCost', { x: [Array.from(m.citizensLooking, (citizenId) => disposableIncome[citizenId]),
+                                                             Array.from(m.citizensRenting, (citizenId) => disposableIncome[citizenId]),
+                                                             Array.from(m.citizensOwningTheirHomes, (citizenId) => disposableIncome[citizenId])],
+                                                         y: [Array.from(m.citizensLooking, (citizenId) => weeklyToYearlyRent(m.citizenHousingCost(m.citizens[citizenId]))),
+                                                             Array.from(m.citizensRenting, (citizenId) => weeklyToYearlyRent(m.citizenHousingCost(m.citizens[citizenId]))),
+                                                             Array.from(m.citizensOwningTheirHomes, (citizenId) => weeklyToYearlyRent(m.citizens[citizenId].residence.mortgagePayment))] });
+
 
         const binCuts = [0, 1, 3, 6];
         const binMap = [];
